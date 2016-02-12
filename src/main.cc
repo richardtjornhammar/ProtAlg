@@ -27,6 +27,7 @@
 #include "types.h"
 #include "argpa.h"	
 #include "iofun.h"
+#include "mdiag.h"
 
 // rm src/*~
 // COMPILE:: g++ -I/usr/local/include/clipper -std=c++11 src/* -L/usr/local/lib -lmmdb -lclipper-core -lclipper-contrib -lgsl -lblas -o rich_dyn
@@ -191,10 +192,10 @@ int main ( int argc, char ** argv ) {
 				double zc = nl;
 
 //			CALULATE PROJECTION
-				rich::calc_map calc_map;
-				nb = calc_map.get_nbins();
+				rich::calc_map cmap;
+				int nb = cmap.get_nbins();
 				gsl_matrix *P = gsl_matrix_calloc(nb,nb);
-				calc_map.proj(	P , density ,
+				cmap.proj(	P , density ,
 						OS , rc , zc );
 				if(verbose) {
 					rich::tensorIO tIO;
