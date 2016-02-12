@@ -196,7 +196,7 @@ int main ( int argc, char ** argv ) {
 				int nb = cmap.get_nbins();
 				gsl_matrix *P = gsl_matrix_calloc(nb,nb);
 				cmap.proj(	P , density ,
-						OS , rc , zc );
+						OS , n1 , rc , zc );
 				if(verbose) {
 					rich::tensorIO tIO;
 					tIO.output_matrix(OS); tIO.output_matrix(V);

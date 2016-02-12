@@ -11,7 +11,8 @@ using namespace rich;
 
 int
 calc_map::proj(	gsl_matrix *P  , clipper::Xmap<float> EDENS,
-		gsl_matrix *OS , double RC , double ZC ) {
+		gsl_matrix *OS, gsl_vector *origo,
+		double RC , double ZC ) {
 
 	if(P->size1!=P->size2 || P->size1 != nbins_ )
 		return 1;
@@ -19,11 +20,13 @@ calc_map::proj(	gsl_matrix *P  , clipper::Xmap<float> EDENS,
 		return 1;
 
 	clipper::Xmap_base::Map_reference_index	ix;
-	clipper::Coord_grid			cg0;
+	clipper::Coord_grid	cg0;
+	clipper::Coord_orth	co0;
 
 	for (ix = EDENS.first(); !ix.last(); ix.next()) {
 		double v0	= EDENS[ix];
 		cg0		= ix.coord();
+		co0		= ix.coord_orth();
 	}
 
 	return 0;
