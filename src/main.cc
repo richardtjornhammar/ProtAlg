@@ -78,6 +78,7 @@ int main ( int argc, char ** argv ) {
 
 	rich::map_manager mmap;
 	int rv = mmap.assign_map( run_args.second[1] );
+	clipper::Xmap<float> density = mmap.get_map();
 
 //	THIS TOOL CURRENTLY ONLY FOR PDB
 	CMMDBManager   mmdb;
@@ -155,7 +156,7 @@ int main ( int argc, char ** argv ) {
 					std::cout << "ATOM:: " << atype << " " << etype << std::endl;
 					gsl_vector_set(vt,XX,atoms_T[iat]->x);
 					gsl_vector_set(vt,YY,atoms_T[iat]->y);
-					gsl_vector_set(vt,ZZ,atoms_T[iat]->z);							
+					gsl_vector_set(vt,ZZ,atoms_T[iat]->z);
 					if( atype=="CA" )
 						gsl_vector_memcpy(c1,vt);
 					if( atype=="CB" )
@@ -189,8 +190,23 @@ int main ( int argc, char ** argv ) {
 				double rc = sqrt(gsl_vector_get(S,0))*0.5;
 				double zc = nl;
 
-				rich::tensorIO tIO;
-				tIO.output_matrix(OS);tIO.output_matrix(V);
+//			CALULATE PROJECTION
+				rich::calc_map calc_map;
+				nb = calc_map.get_nbins();
+				gsl_matrix *P = gsl_matrix_calloc(nb,nb);
+				calc_map.proj(	P , density ,
+						OS , rc , zc );
+				if(verbose) {
+					rich::tensorIO tIO;
+					tIO.output_matrix(OS); tIO.output_matrix(V);
+				}
+
+				gsl_matrix_free( P );
+				gsl_matrix_free( A );
+				gsl_matrix_free( V );
+				gsl_matrix_free( OS );
+				gsl_vector_free( S );
+				gsl_vector_free( wrk );
 			}
 		}
 	}
