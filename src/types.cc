@@ -92,10 +92,30 @@ quaternion::assign_quaterion( gsl_vector *v, double angle ){ // angle in radians
 
   		norm   = 1.0/sqrt(vx*vx+vy*vy+vz*vz);
 
-		gsl_vector_set ( q_ , XX ,  cos(angle*0.5) );
-		gsl_vector_set ( q_ , YY , vx * norm * sin(angle*0.5) );
-		gsl_vector_set ( q_ , ZZ , vy * norm * sin(angle*0.5) );
-		gsl_vector_set ( q_ ,DIM , vz * norm * sin(angle*0.5) );
+		double w=cos(angle*0.5);
+		double x=vx*norm*sin(angle*0.5);
+		double y=vy*norm*sin(angle*0.5);
+		double z=vz*norm*sin(angle*0.5);
+
+		gsl_vector_set ( q_ , XX , w );
+		gsl_vector_set ( q_ , YY , x );
+		gsl_vector_set ( q_ , ZZ , y );
+		gsl_vector_set ( q_ ,DIM , z );
+
+		gsl_matrix_set( R_, XX, XX, 1.0-2.0*(y*y+z*z) );
+		gsl_matrix_set( R_, XX, YY, 2*(x*y-z*w) );
+		gsl_matrix_set( R_, XX, ZZ, 2*(x*z+y*w) );
+
+		gsl_matrix_set( R_, YY, XX, 2*(x*y+z*w) );
+		gsl_matrix_set( R_, YY, YY, 1-2*(x*x+z*z) );
+		gsl_matrix_set( R_, YY, ZZ, 2*(y*z-x*w) );
+
+		gsl_matrix_set( R_, ZZ, XX, 2*(x*z-y*w) );
+		gsl_matrix_set( R_, ZZ, YY, 2*(y*z+x*w) );
+		gsl_matrix_set( R_, ZZ, ZZ, 1-2*(x*x+y*y) );
+
+		//R=[1-2*(y*y+z*z) 2*(x*y-z*w) 2*(x*z+y*w) ; 2*(x*y+z*w) 1-2*(x*x+z*z) 2*(y*z-x*w) ; 2*(x*z-y*w) 2*(y*z+x*w) 1-2*(x*x+y*y) ]
+
 		bSet_=true;
 
 		return 0;
@@ -121,10 +141,12 @@ quaternion::rotate_particles( particles ps ) {
 int
 quaternion::rotate_particles( particles ps , gsl_vector *v0 ) {
 	if( is_complete() ){
+		gsl_vector *tmp=gsl_vector_calloc(DIM);
 		for(int i=0;i<ps.size();i++){
 			rotate_coord(ps[i].second);
 			gsl_vector_add(ps[i].second,v0);
 		}
+		gsl_vector_free(tmp);
 	}
 	else {
 		return 1;
@@ -140,21 +162,25 @@ quaternion::rotate_coord( gsl_vector *x )
 
 	if( is_complete() && x->size==DIM ){
 
-		double q[DIM+1],xo[DIM];
-		q[XX] = gsl_vector_get(q_,XX); q[YY ] = gsl_vector_get(q_,YY );
-		q[ZZ] = gsl_vector_get(q_,ZZ); q[DIM] = gsl_vector_get(q_,DIM);
+		if(0){
+			double q[DIM+1],xo[DIM];
+			q[XX] = gsl_vector_get(q_,XX); q[YY ] = gsl_vector_get(q_,YY );
+			q[ZZ] = gsl_vector_get(q_,ZZ); q[DIM] = gsl_vector_get(q_,DIM);
 
-		xo[XX] = gsl_vector_get(x, XX); 
-		xo[YY] = gsl_vector_get(x, YY); 
-		xo[ZZ] = gsl_vector_get(x, ZZ);
+			xo[XX] = gsl_vector_get(x, XX); 
+			xo[YY] = gsl_vector_get(x, YY); 
+			xo[ZZ] = gsl_vector_get(x, ZZ);
  
-		xX = (q[0]*q[0]+q[1]*q[1]-q[2]*q[2]-q[3]*q[3])*xo[XX] + (2*q[1]*q[2] - 2*q[0]*q[3])*xo[YY] + (2*q[1]*q[3] + 2*q[0]*q[2])*xo[ZZ];
-		yY = (2*q[1]*q[2] + 2*q[0]*q[3])*xo[XX] + (q[0]*q[0]-q[1]*q[1] + q[2]*q[2]-q[3]*q[3])*xo[YY] + (2*q[2]*q[3]-2*q[0]*q[1])*xo[ZZ];
-		zZ = (2*q[1]*q[3] - 2*q[0]*q[2])*xo[XX] + (2*q[2]*q[3] + 2*q[0]*q[1])*xo[YY] + (q[0]*q[0]-q[1]*q[1]-q[2]*q[2]+q[3]*q[3])*xo[ZZ];
+			xX = (q[0]*q[0]+q[1]*q[1]-q[2]*q[2]-q[3]*q[3])*xo[XX] + (2*q[1]*q[2] - 2*q[0]*q[3])*xo[YY] + (2*q[1]*q[3] + 2*q[0]*q[2])*xo[ZZ];
+			yY = (2*q[1]*q[2] + 2*q[0]*q[3])*xo[XX] + (q[0]*q[0]-q[1]*q[1] + q[2]*q[2]-q[3]*q[3])*xo[YY] + (2*q[2]*q[3]-2*q[0]*q[1])*xo[ZZ];
+			zZ = (2*q[1]*q[3] - 2*q[0]*q[2])*xo[XX] + (2*q[2]*q[3] + 2*q[0]*q[1])*xo[YY] + (q[0]*q[0]-q[1]*q[1]-q[2]*q[2]+q[3]*q[3])*xo[ZZ];
 
-		gsl_vector_set(x,XX,xX);
-		gsl_vector_set(x,YY,yY);
-		gsl_vector_set(x,ZZ,zZ);
+			gsl_vector_set(x,XX,xX);
+			gsl_vector_set(x,YY,yY);
+			gsl_vector_set(x,ZZ,zZ);
+		}else{
+			gsl_blas_dgemv (CblasNoTrans ,1.0, R_, x, 0.0, x);
+		}
 
   		return 0;
 	}else{

@@ -113,9 +113,9 @@ int main ( int argc, char ** argv ) {
 	PPCModel	model_T;
 	PPCChain	chain_T;
 	PPCResidue	resid_T;
-	PPCAtom		atoms_T,atom_T2;
+	PPCAtom		atoms_T,atoms_T2;
 	int		nModels;
-	int 		nChains,nResidues,nAtoms;
+	int 		nChains,nResidues,nAtoms,nAtoms2;
 	int		imod,icha,ires,iat;
 
 	mmdb.GetModelTable( model_T, nModels );
@@ -149,6 +149,12 @@ int main ( int argc, char ** argv ) {
 				residue_atoms.clear();
 
 				mmdb.GetAtomTable    ( imod ,icha ,ires , atoms_T, nAtoms );
+				if( ires<nResidues-1 ) {
+					mmdb.GetAtomTable    ( imod ,icha ,ires+1 , atoms_T2, nAtoms2 );
+					gsl_vector_set(n2,XX,atoms_T2[0]->x);
+					gsl_vector_set(n2,YY,atoms_T2[0]->y);
+					gsl_vector_set(n2,ZZ,atoms_T2[0]->z);
+				}
 				gsl_matrix *A	= gsl_matrix_calloc(nAtoms,DIM);
 				gsl_matrix *V	= gsl_matrix_calloc(DIM,DIM);
 				gsl_matrix *OS	= gsl_matrix_calloc(DIM,DIM);
@@ -158,16 +164,19 @@ int main ( int argc, char ** argv ) {
 				gsl_vector *v0 = gsl_vector_calloc(DIM);
 
 				for (iat = 0; iat<nAtoms ; iat++ ) {
+
 					char a_inf[256];
 					atoms_T[iat]->GetAtomID(a_inf);
 					std::string atype = mmhelp.atom_type(a_inf);
 					std::string etype = mmhelp.atom_symb(a_inf);
-					// std::cout << "ATOM:: " << atype << " " << etype << std::endl;
+
 					gsl_vector_set(vt,XX,atoms_T[iat]->x);
 					gsl_vector_set(vt,YY,atoms_T[iat]->y);
 					gsl_vector_set(vt,ZZ,atoms_T[iat]->z);
+
 					if(iat==0)
 						gsl_vector_memcpy(v0,vt);
+
 					rich::particle res_atom;
 					res_atom.second = gsl_vector_alloc(DIM);
 					res_atom.first  = etype; 
@@ -180,9 +189,11 @@ int main ( int argc, char ** argv ) {
 					if( atype=="CB" )
 						gsl_vector_memcpy(c2,vt);
 					if( atype=="N" && etype=="N" )
-						gsl_vector_memcpy(n1,vt);	
-					if( atype=="C" && etype=="C" )
-						gsl_vector_memcpy(n2,vt);
+						gsl_vector_memcpy(n1,vt);
+					if(ires>=nResidues-1)
+						if( atype=="C" && etype=="C" )
+							gsl_vector_memcpy(n2,vt);
+
 					gsl_matrix_set_row(A,iat,vt);
 				}
 //			CALCULATE ORTHONORMAL SYSTEM
@@ -221,15 +232,38 @@ int main ( int argc, char ** argv ) {
 					fatal();
 				}
 
-				if( ires == 40 ) { // TESTCASE
+				if( ires == 40 && icha==0 ) { // TESTCASE
 					rich::mat_io mIO;
 					mIO.write_gsl2datn(P, CN , "testproj.dat" );
 					mIO.write_vdbl2dat( theta, "testTheta.dat");
 					rich::quaternion q;
-					q.assign_quaterion( nh , 330.0/180.0*M_PI );
+					q.assign_quaterion( nh , -120.0/180.0*M_PI );
 					q.rotate_particles( residue_atoms , v0 );
 					rich::fileIO fIO;
-					fIO.output_geometry(residue_atoms, "rotres.xyz");
+					fIO.output_pdb("rotres.pdb", residue_atoms );
+					// ALSO OUTPUT OS
+					rich::particles osys;
+					rich::particle ptmp[4];
+					ptmp[0].first="Ga";
+					ptmp[0].second = gsl_vector_alloc(DIM);
+					gsl_vector_add(nh,v0);
+					gsl_vector_memcpy(ptmp[0].second,nh);
+					osys.push_back(ptmp[0]);
+					ptmp[1].first="In";
+					ptmp[1].second = gsl_vector_alloc(DIM);
+					gsl_vector_add(ph,v0);
+					gsl_vector_memcpy(ptmp[1].second,ph);
+					osys.push_back(ptmp[1]);
+					ptmp[2].first="Sn";
+					ptmp[2].second = gsl_vector_alloc(DIM);
+					gsl_vector_add(qh,v0);
+					gsl_vector_memcpy(ptmp[2].second,qh);
+					osys.push_back(ptmp[2]);
+					ptmp[3].first="Fe";
+					ptmp[3].second = gsl_vector_alloc(DIM);
+					gsl_vector_memcpy(ptmp[3].second,v0);
+					osys.push_back(ptmp[3]);
+					fIO.output_pdb("system.pdb", osys );
 				}
 
 				if(verbose) {

@@ -237,7 +237,7 @@ mat_io::write_gsl2datn( gsl_matrix *A, gsl_matrix *N, std::string fstr ) {
 
 
 void 
-fileIO::output_geometry( particles px, std::string filename){
+fileIO::output_geometry( std::string filename, particles px ){
 	const char *c_filename = filename.c_str();
 	std::ofstream outp_coord;
 	outp_coord.open(c_filename);
@@ -253,7 +253,7 @@ fileIO::output_geometry( particles px, std::string filename){
 }
 
 void 
-fileIO::output_geometry( particles px, std::string filename, std::string label){
+fileIO::output_geometry( std::string filename, particles px, std::string label ){
 	const char *c_filename = filename.c_str();
 	std::ofstream outp_coord;
 	outp_coord.open(c_filename);

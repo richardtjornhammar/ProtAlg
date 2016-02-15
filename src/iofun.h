@@ -58,8 +58,8 @@ namespace rich {
 		//! I
 			particles read_xyz(std::string filename);
 		//! O
-			void output_geometry( particles px, std::string filename);
-			void output_geometry( particles px, std::string filename, std::string label);
+			void output_geometry( std::string filename, particles px );
+			void output_geometry( std::string fname, particles px, std::string lbl);
 		//! SPECIAL FORMAT
 			void output_pdb( std::string filename, particles px, gsl_vector *v);
 			void output_pdb( std::string filename, particles px, std::vector<int> ndx );

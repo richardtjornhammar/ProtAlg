@@ -85,7 +85,7 @@ namespace rich {
 
 	class quaternion {
 		public:
-			inline	quaternion() { bSet_= false;  q_= gsl_vector_calloc(4);};
+			inline	quaternion() { bSet_= false;  q_= gsl_vector_calloc(4); R_= gsl_matrix_calloc(DIM,DIM); };
 			void	clear(void)  { gsl_vector_set_zero(q_); bSet_= false; };
 			int	assign_quaterion( gsl_vector *x, double angle );
 			int	rotate_coord	( gsl_vector *x );
@@ -94,10 +94,12 @@ namespace rich {
 			bool	is_complete(){ return bSet_; };
 			~quaternion() {
     				gsl_vector_free( q_ );
+				gsl_matrix_free( R_ );
 			};
 		private:
 			bool bSet_;
 			gsl_vector *q_; // quaternion 
+			gsl_matrix *R_;
 	};
 }
 
