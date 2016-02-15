@@ -25,6 +25,9 @@
 
 namespace rich {
 
+	typedef std::pair<std::string, gsl_vector * >	particle;
+	typedef std::vector< particle > 		particles;
+
 	class phys_constants {
 		public:
 			phys_constants() { // SI UNITS
@@ -74,14 +77,28 @@ namespace rich {
 
 	class math_helper {
 		public:
+			math_helper(){ bHelp_=false; };
 			void	gsl_cross3D( gsl_vector * , gsl_vector *, gsl_vector *);
 		private:
-			;
+			bool bHelp_;
 	};
 
-
-	typedef std::pair<std::string, gsl_vector * >	particle;
-	typedef std::vector< particle > 		particles;
+	class quaternion {
+		public:
+			inline	quaternion() { bSet_= false;  q_= gsl_vector_calloc(4);};
+			void	clear(void)  { gsl_vector_set_zero(q_); bSet_= false; };
+			int	assign_quaterion( gsl_vector *x, double angle );
+			int	rotate_coord	( gsl_vector *x );
+			int	rotate_particles( particles );
+			int	rotate_particles( particles , gsl_vector * );
+			bool	is_complete(){ return bSet_; };
+			~quaternion() {
+    				gsl_vector_free( q_ );
+			};
+		private:
+			bool bSet_;
+			gsl_vector *q_; // quaternion 
+	};
 }
 
 #endif

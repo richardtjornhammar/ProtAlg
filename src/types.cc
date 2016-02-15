@@ -78,3 +78,87 @@ map_manager::assign_map( std::string inp_str ) {
 
 	return 0;	
 }
+
+int	
+quaternion::assign_quaterion( gsl_vector *v, double angle ){ // angle in radians
+	if( v->size==3 ){
+
+		double norm, vx, vy, vz;
+		gsl_vector xo;
+
+		vx = gsl_vector_get( v, XX );
+		vy = gsl_vector_get( v, YY );
+		vx = gsl_vector_get( v, ZZ );
+
+  		norm   = 1.0/sqrt(vx*vx+vy*vy+vz*vz);
+
+		gsl_vector_set ( q_ , XX ,  cos(angle*0.5) );
+		gsl_vector_set ( q_ , YY , vx * norm * sin(angle*0.5) );
+		gsl_vector_set ( q_ , ZZ , vy * norm * sin(angle*0.5) );
+		gsl_vector_set ( q_ ,DIM , vz * norm * sin(angle*0.5) );
+		bSet_=true;
+
+		return 0;
+	}else {
+		return 1;
+	}
+}
+
+int
+quaternion::rotate_particles( particles ps ) {
+	if( is_complete() ){
+		for(int i=0;i<ps.size();i++){
+			rotate_coord(ps[i].second);
+		}
+	}
+	else {
+		return 1;
+	}
+
+	return 0;
+}
+
+int
+quaternion::rotate_particles( particles ps , gsl_vector *v0 ) {
+	if( is_complete() ){
+		for(int i=0;i<ps.size();i++){
+			rotate_coord(ps[i].second);
+			gsl_vector_add(ps[i].second,v0);
+		}
+	}
+	else {
+		return 1;
+	}
+
+	return 0;
+}
+
+int
+quaternion::rotate_coord( gsl_vector *x ) 
+{
+	double xX,yY,zZ;
+
+	if( is_complete() && x->size==DIM ){
+
+		double q[DIM+1],xo[DIM];
+		q[XX] = gsl_vector_get(q_,XX); q[YY ] = gsl_vector_get(q_,YY );
+		q[ZZ] = gsl_vector_get(q_,ZZ); q[DIM] = gsl_vector_get(q_,DIM);
+
+		xo[XX] = gsl_vector_get(x, XX); 
+		xo[YY] = gsl_vector_get(x, YY); 
+		xo[ZZ] = gsl_vector_get(x, ZZ);
+ 
+		xX = (q[0]*q[0]+q[1]*q[1]-q[2]*q[2]-q[3]*q[3])*xo[XX] + (2*q[1]*q[2] - 2*q[0]*q[3])*xo[YY] + (2*q[1]*q[3] + 2*q[0]*q[2])*xo[ZZ];
+		yY = (2*q[1]*q[2] + 2*q[0]*q[3])*xo[XX] + (q[0]*q[0]-q[1]*q[1] + q[2]*q[2]-q[3]*q[3])*xo[YY] + (2*q[2]*q[3]-2*q[0]*q[1])*xo[ZZ];
+		zZ = (2*q[1]*q[3] - 2*q[0]*q[2])*xo[XX] + (2*q[2]*q[3] + 2*q[0]*q[1])*xo[YY] + (q[0]*q[0]-q[1]*q[1]-q[2]*q[2]+q[3]*q[3])*xo[ZZ];
+
+		gsl_vector_set(x,XX,xX);
+		gsl_vector_set(x,YY,yY);
+		gsl_vector_set(x,ZZ,zZ);
+
+  		return 0;
+	}else{
+		return 1;
+	}
+}
+

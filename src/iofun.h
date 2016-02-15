@@ -52,6 +52,24 @@ namespace rich {
 		private:
 			int N_;
 	};
+
+	class fileIO {
+		public:
+		//! I
+			particles read_xyz(std::string filename);
+		//! O
+			void output_geometry( particles px, std::string filename);
+			void output_geometry( particles px, std::string filename, std::string label);
+		//! SPECIAL FORMAT
+			void output_pdb( std::string filename, particles px, gsl_vector *v);
+			void output_pdb( std::string filename, particles px, std::vector<int> ndx );
+			void output_pdb( std::string filename, particles px, std::vector<int> ndx1, std::vector<int> ndx2 );
+			void output_pdb( std::string filename, particles px, std::vector<int> ndx, std::string label );
+			void output_pdb( std::string filename, particles px );
+			void output_pdb( std::string filename, gsl_matrix *M, gsl_vector *v);
+			void output_pdb( std::string filename, gsl_matrix *M, std::vector<std::string > anams);
+	};
+
 }
 
 #endif

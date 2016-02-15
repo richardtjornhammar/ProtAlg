@@ -63,6 +63,7 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 		gsl_blas_ddot ( rvec, yh , &y );
 		gsl_blas_ddot ( rvec, zh , &z );
 		if( (x*x+y*y) < RC*RC && z<ZC && z>0.0 ) {
+
 			double	res   	 = atan2(y,x)*180.0/M_PI+180.0;
 			int	ires 	 = floor(res);
 			if(verbose) {
@@ -84,11 +85,11 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 				cval	 = gsl_matrix_get(C,I,J);
 				pval	+= v0*v0;
 				cval	+= 1.0;
-				gsl_matrix_set(P,I,J,pval);
-				gsl_matrix_set(C,I,J,cval);
+				gsl_matrix_set( P, I, J, pval );
+				gsl_matrix_set( C, I, J, cval );
 			}
 		}
-	}	
+	}
 
 	return 0;
 }

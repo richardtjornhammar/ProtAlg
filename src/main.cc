@@ -144,14 +144,18 @@ int main ( int argc, char ** argv ) {
 		nChains = mmdb.GetNumberOfChains( imod ); 
 		for ( icha = 0 ; icha < nChains ; icha++ ) { 
 			nResidues = mmdb.GetNumberOfResidues( imod , icha ); 
-
+			rich::particles residue_atoms;
 			for ( ires = 0 ; ires < nResidues ; ires++ ) { 
+				residue_atoms.clear();
+
 				mmdb.GetAtomTable    ( imod ,icha ,ires , atoms_T, nAtoms );
 				gsl_matrix *A	= gsl_matrix_calloc(nAtoms,DIM);
 				gsl_matrix *V	= gsl_matrix_calloc(DIM,DIM);
 				gsl_matrix *OS	= gsl_matrix_calloc(DIM,DIM);
 				gsl_vector *S	= gsl_vector_calloc(DIM);
 				gsl_vector *wrk	= gsl_vector_calloc(DIM);
+
+				gsl_vector *v0 = gsl_vector_calloc(DIM);
 
 				for (iat = 0; iat<nAtoms ; iat++ ) {
 					char a_inf[256];
@@ -162,6 +166,15 @@ int main ( int argc, char ** argv ) {
 					gsl_vector_set(vt,XX,atoms_T[iat]->x);
 					gsl_vector_set(vt,YY,atoms_T[iat]->y);
 					gsl_vector_set(vt,ZZ,atoms_T[iat]->z);
+					if(iat==0)
+						gsl_vector_memcpy(v0,vt);
+					rich::particle res_atom;
+					res_atom.second = gsl_vector_alloc(DIM);
+					res_atom.first  = etype; 
+					gsl_vector_memcpy(res_atom.second,vt);
+					gsl_vector_sub(res_atom.second,v0);
+					residue_atoms.push_back(res_atom);
+
 					if( atype=="CA" )
 						gsl_vector_memcpy(c1,vt);
 					if( atype=="CB" )
@@ -200,17 +213,25 @@ int main ( int argc, char ** argv ) {
 				int nb = cmap.set_nbins(25);
 				gsl_matrix *P  = gsl_matrix_calloc(nb,nb);
 				gsl_matrix *CN = gsl_matrix_calloc(nb,nb);
+
 				if( cmap.proj(	P , CN , density ,
 						OS , c1 , rc , zc,
 						&theta ) ) {
 					std::cout << "ERROR::FAILED" << std::endl;
 					fatal();
 				}
-				if(ires==40) {
+
+				if( ires == 40 ) { // TESTCASE
 					rich::mat_io mIO;
-					mIO.write_gsl2datn(P, CN, "testproj.dat" );
-					mIO.write_vdbl2dat( theta,"testTheta.dat");
+					mIO.write_gsl2datn(P, CN , "testproj.dat" );
+					mIO.write_vdbl2dat( theta, "testTheta.dat");
+					rich::quaternion q;
+					q.assign_quaterion( nh , 330.0/180.0*M_PI );
+					q.rotate_particles( residue_atoms , v0 );
+					rich::fileIO fIO;
+					fIO.output_geometry(residue_atoms, "rotres.xyz");
 				}
+
 				if(verbose) {
 					rich::tensorIO tIO;
 					tIO.output_matrix(OS); tIO.output_matrix(V);
