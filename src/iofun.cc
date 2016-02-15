@@ -2,6 +2,8 @@
 #include <string>
 #include <iostream>
 #include <algorithm>
+#include <fstream>
+#include <sstream>
 #include "iofun.h"
 
 using namespace rich;
@@ -186,3 +188,48 @@ tensorIO::output_geometry(particles px) {
 	}
 }
 
+int
+mat_io::write_gsl2dat ( gsl_matrix *A, std::string fstr ) {
+	const char *c_filename = fstr.c_str();
+	std::ofstream outf;
+	outf.open(c_filename);
+	for( int i=0 ; i<A->size1 ; i++ ) {
+	for( int j=0 ; j<A->size2 ; j++ ) {
+		outf	<< " " << gsl_matrix_get(A,i,j); 
+	}
+		outf	<< std::endl;
+	}
+	outf.close();
+	return 0;
+}
+
+int
+mat_io::write_vdbl2dat( std::vector<double> vdbl, std::string fstr ){
+	const char *c_filename = fstr.c_str();
+	std::ofstream outf;
+	outf.open(c_filename);
+	for( int i=0 ; i<vdbl.size() ; i++ ) {
+		outf	<< " " << i << " " << vdbl[i] << std::endl; 
+	}
+	outf.close();
+	return 0;
+}
+
+int
+mat_io::write_gsl2datn( gsl_matrix *A, gsl_matrix *N, std::string fstr ) {
+	const char *c_filename = fstr.c_str();
+	std::ofstream outf;
+	outf.open(c_filename);
+	for( int i=0 ; i<A->size1 ; i++ ) {
+	for( int j=0 ; j<A->size2 ; j++ ) {
+		double cnt = gsl_matrix_get(N,i,j);
+		if(cnt>0)
+			outf	<< " " << sqrt(gsl_matrix_get(A,i,j))/cnt; 
+		else
+			outf	<< " " << 0.0; 
+	}
+		outf	<< std::endl;
+	}
+	outf.close();
+	return 0;
+}

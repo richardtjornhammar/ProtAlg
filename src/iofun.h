@@ -43,6 +43,15 @@ namespace rich {
 			clipper::CCP4MTZfile	mtzin_;
 			clipper::String		ipfile_,ipcol_;
 	};
+
+	class mat_io {
+		public:
+			int write_gsl2dat  ( gsl_matrix *, std::string );
+			int write_gsl2datn ( gsl_matrix *, gsl_matrix *, std::string );
+			int write_vdbl2dat ( std::vector<double> , std::string );
+		private:
+			int N_;
+	};
 }
 
 #endif

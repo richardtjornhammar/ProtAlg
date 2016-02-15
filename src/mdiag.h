@@ -18,8 +18,9 @@ namespace rich {
 			int set_nbins( int N )	{ nbins_=N; return N; };
 			int get_nbins( void  )	{ return nbins_; };
 			int bmp (	gsl_matrix * , std::string );
-			int proj(	gsl_matrix * , clipper::Xmap<float> ,
-					gsl_matrix * , gsl_vector * , double , double  );
+			int proj(	gsl_matrix * , gsl_matrix * , clipper::Xmap<float> ,
+					gsl_matrix * , gsl_vector * , double , double,
+					std::vector<double> * );
 		private:
 			int nbins_;
 	};

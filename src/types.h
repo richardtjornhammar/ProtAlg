@@ -21,6 +21,7 @@
 #define YY	1
 #define ZZ	2
 #define	DIM	3
+#define _VERBOSE_ 0
 
 namespace rich {
 

@@ -136,6 +136,10 @@ int main ( int argc, char ** argv ) {
 	gsl_vector *ph = gsl_vector_calloc(DIM);
 	gsl_vector *qh = gsl_vector_calloc(DIM);
 
+	std::vector<double> theta;
+	for ( int i=0 ; i<360 ; i++ )
+		theta.push_back(0.0);
+
 	for ( imod=1 ; imod<=nModels ; imod++ ) {
 		nChains = mmdb.GetNumberOfChains( imod ); 
 		for ( icha = 0 ; icha < nChains ; icha++ ) { 
@@ -154,7 +158,7 @@ int main ( int argc, char ** argv ) {
 					atoms_T[iat]->GetAtomID(a_inf);
 					std::string atype = mmhelp.atom_type(a_inf);
 					std::string etype = mmhelp.atom_symb(a_inf);
-					std::cout << "ATOM:: " << atype << " " << etype << std::endl;
+					// std::cout << "ATOM:: " << atype << " " << etype << std::endl;
 					gsl_vector_set(vt,XX,atoms_T[iat]->x);
 					gsl_vector_set(vt,YY,atoms_T[iat]->y);
 					gsl_vector_set(vt,ZZ,atoms_T[iat]->z);
@@ -193,13 +197,24 @@ int main ( int argc, char ** argv ) {
 
 //			CALULATE PROJECTION
 				rich::calc_map cmap;
-				int nb = cmap.get_nbins();
-				gsl_matrix *P = gsl_matrix_calloc(nb,nb);
-				cmap.proj(	P , density ,
-						OS , n1 , rc , zc );
+				int nb = cmap.set_nbins(25);
+				gsl_matrix *P  = gsl_matrix_calloc(nb,nb);
+				gsl_matrix *CN = gsl_matrix_calloc(nb,nb);
+				if( cmap.proj(	P , CN , density ,
+						OS , c1 , rc , zc,
+						&theta ) ) {
+					std::cout << "ERROR::FAILED" << std::endl;
+					fatal();
+				}
+				if(ires==40) {
+					rich::mat_io mIO;
+					mIO.write_gsl2datn(P, CN, "testproj.dat" );
+					mIO.write_vdbl2dat( theta,"testTheta.dat");
+				}
 				if(verbose) {
 					rich::tensorIO tIO;
 					tIO.output_matrix(OS); tIO.output_matrix(V);
+					tIO.output_vector(nh);
 				}
 
 				gsl_matrix_free( P );
