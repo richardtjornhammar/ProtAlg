@@ -155,11 +155,12 @@ int main ( int argc, char ** argv ) {
 					gsl_vector_set(n2,YY,atoms_T2[0]->y);
 					gsl_vector_set(n2,ZZ,atoms_T2[0]->z);
 				}
-				gsl_matrix *A	= gsl_matrix_calloc(nAtoms,DIM);
-				gsl_matrix *V	= gsl_matrix_calloc(DIM,DIM);
-				gsl_matrix *OS	= gsl_matrix_calloc(DIM,DIM);
-				gsl_vector *S	= gsl_vector_calloc(DIM);
-				gsl_vector *wrk	= gsl_vector_calloc(DIM);
+
+				gsl_matrix *A	= gsl_matrix_calloc( nAtoms,	 DIM);
+				gsl_matrix *V	= gsl_matrix_calloc( DIM,	 DIM);
+				gsl_matrix *OS	= gsl_matrix_calloc( DIM,	 DIM);
+				gsl_vector *S	= gsl_vector_calloc( DIM );
+				gsl_vector *wrk	= gsl_vector_calloc( DIM );
 
 				gsl_vector *v0 = gsl_vector_calloc(DIM);
 
@@ -181,7 +182,6 @@ int main ( int argc, char ** argv ) {
 					res_atom.second = gsl_vector_alloc(DIM);
 					res_atom.first  = etype; 
 					gsl_vector_memcpy(res_atom.second,vt);
-					gsl_vector_sub(res_atom.second,v0);
 					residue_atoms.push_back(res_atom);
 
 					if( atype=="CA" )
@@ -190,43 +190,29 @@ int main ( int argc, char ** argv ) {
 						gsl_vector_memcpy(c2,vt);
 					if( atype=="N" && etype=="N" )
 						gsl_vector_memcpy(n1,vt);
-					if(ires>=nResidues-1)
+					if( ires>=nResidues-1 )
 						if( atype=="C" && etype=="C" )
 							gsl_vector_memcpy(n2,vt);
 
 					gsl_matrix_set_row(A,iat,vt);
 				}
+
 //			CALCULATE ORTHONORMAL SYSTEM
 				rich::math_helper mah;
-				gsl_vector_sub(n2,n1);
-				gsl_vector_sub(c2,c1);
-				gsl_vector_memcpy(nh,n2);
-				gsl_vector_memcpy(ph,c2);
-				double nl = gsl_blas_dnrm2(nh);
-				double pl = gsl_blas_dnrm2(ph);
-				gsl_vector_scale(nh,1.0/nl); gsl_vector_scale(ph,1.0/pl);
-				mah.gsl_cross3D(nh,ph,qh);
-				double ql = gsl_blas_dnrm2(qh);			
-				gsl_vector_scale(qh,1.0/ql);
-
-//			ASSIGN ORTHONORMAL SYSTEM
-				gsl_matrix_set_row(OS,0,nh);
-				gsl_matrix_set_row(OS,1,ph);
-				gsl_matrix_set_row(OS,2,qh);
+				double zc = mah.gsl_calc_orth( n2, n1, c2, c1, OS );
 
 //			CALCULATE LIMITS
 				gsl_linalg_SV_decomp(A,V,S,wrk);
 				double rc = sqrt(gsl_vector_get(S,0))*0.5;
-				double zc = nl;
 
 //			CALULATE PROJECTION
 				rich::calc_map cmap;
-				int nb = cmap.set_nbins(25);
+				int nb = cmap.set_nbins(20);
 				gsl_matrix *P  = gsl_matrix_calloc(nb,nb);
 				gsl_matrix *CN = gsl_matrix_calloc(nb,nb);
 
 				if( cmap.proj(	P , CN , density ,
-						OS , c1 , rc , zc,
+						OS , v0 , rc , zc,
 						&theta ) ) {
 					std::cout << "ERROR::FAILED" << std::endl;
 					fatal();
@@ -234,36 +220,34 @@ int main ( int argc, char ** argv ) {
 
 				if( ires == 40 && icha==0 ) { // TESTCASE
 					rich::mat_io mIO;
-					mIO.write_gsl2datn(P, CN , "testproj.dat" );
-					mIO.write_vdbl2dat( theta, "testTheta.dat");
+					mIO.write_gsl2datn( P, CN, "testproj.dat"  );
+					mIO.write_vdbl2dat( theta, "testTheta.dat" );
+					gsl_matrix_get_row( nh, OS, 0 );
 					rich::quaternion q;
-					q.assign_quaterion( nh , -120.0/180.0*M_PI );
+					q.assign_quaterion( nh , 240*M_PI/180.0 );
 					q.rotate_particles( residue_atoms , v0 );
 					rich::fileIO fIO;
 					fIO.output_pdb("rotres.pdb", residue_atoms );
-					// ALSO OUTPUT OS
-					rich::particles osys;
-					rich::particle ptmp[4];
-					ptmp[0].first="Ga";
-					ptmp[0].second = gsl_vector_alloc(DIM);
-					gsl_vector_add(nh,v0);
-					gsl_vector_memcpy(ptmp[0].second,nh);
-					osys.push_back(ptmp[0]);
-					ptmp[1].first="In";
-					ptmp[1].second = gsl_vector_alloc(DIM);
-					gsl_vector_add(ph,v0);
-					gsl_vector_memcpy(ptmp[1].second,ph);
-					osys.push_back(ptmp[1]);
-					ptmp[2].first="Sn";
-					ptmp[2].second = gsl_vector_alloc(DIM);
-					gsl_vector_add(qh,v0);
-					gsl_vector_memcpy(ptmp[2].second,qh);
-					osys.push_back(ptmp[2]);
-					ptmp[3].first="Fe";
-					ptmp[3].second = gsl_vector_alloc(DIM);
-					gsl_vector_memcpy(ptmp[3].second,v0);
-					osys.push_back(ptmp[3]);
-					fIO.output_pdb("system.pdb", osys );
+
+					if ( verbose ) { 
+						std::vector<std::string> vs;
+						vs.push_back("Ga"); vs.push_back("In"); vs.push_back("Fe");
+						fIO.output_pdb("system.pdb", OS, vs);
+
+						rich::tensorIO tIO;
+						rich::quaternion q_test;
+						gsl_vector *rx = gsl_vector_calloc(DIM);
+						gsl_vector *ax = gsl_vector_calloc(DIM);
+						gsl_vector_set(rx,XX,1);
+						gsl_vector_set(ax,YY,1);
+						double fi=M_PI*0.5;
+						tIO.output_vector( ax );
+						q_test.assign_quaterion( ax , fi );
+						q_test.print();
+						tIO.output_vector(rx);
+						q_test.rotate_coord(rx);
+						tIO.output_vector(rx);
+					}
 				}
 
 				if(verbose) {

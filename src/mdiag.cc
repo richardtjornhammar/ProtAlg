@@ -17,7 +17,7 @@
 using namespace rich;
 
 int
-calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
+calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS, 
 		gsl_matrix *OS, gsl_vector *origo,
 		double RC , double ZC, std::vector<double> * theta ) {
 
@@ -52,6 +52,7 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 	double x=0,y=0,z=0;
 	for ( ix = EDENS.first(); !ix.last(); ix.next() ) {
 		double v0	= EDENS[ix];
+		double r2	= (x*x+y*y);
 		cg0		= ix.coord();
 		co0		= ix.coord_orth();
 		clipper::Coord_orth rtmp;
@@ -62,8 +63,7 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 		gsl_blas_ddot ( rvec, xh , &x );
 		gsl_blas_ddot ( rvec, yh , &y );
 		gsl_blas_ddot ( rvec, zh , &z );
-		if( (x*x+y*y) < RC*RC && z<ZC && z>0.0 ) {
-
+		if( r2 < RC*RC && z<ZC && z>0.0 ) {
 			double	res   	 = atan2(y,x)*180.0/M_PI+180.0;
 			int	ires 	 = floor(res);
 			if(verbose) {
@@ -74,7 +74,7 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 				std::cout << ires  << " "<< v0 << std::endl;
 			}
 
-			if(ires>=0&&ires<360)
+			if(ires>=0&&ires<360&&r2>RC*RC*0.25)
 				(*(theta))[ires]	+= v0*v0;
  
 			int I = floor( 0.5*(x/RC+1.0)*nbins_ );

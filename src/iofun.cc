@@ -146,7 +146,7 @@ map_io::read_map_header( std::string ifile ) {
 
 void 
 tensorIO::output_vector(gsl_vector *v){
-	std::cout <<"::INFO::VECTOR::"<< std::endl;
+	std::cout <<"::INFO::VECTOR::" << v->size << std::endl;
 	for(int i=0;i<v->size;i++)
 		std::cout << " " << gsl_vector_get(v,i);
 	std::cout << std::endl;
@@ -159,7 +159,7 @@ tensorIO::output_matrix_label(gsl_matrix *M, gsl_vector *v){
 		if(M->size2==v->size)
 			std::cout << " " << gsl_vector_get(v,i);
 		for(int j=0;j<M->size1;j++)
-			std::cout << " " << gsl_matrix_get(M,j,i);
+			std::cout << " " << gsl_matrix_get(M,i,j);
 		std::cout << std::endl;	
 	}
 	std::cout << std::endl;
@@ -170,7 +170,7 @@ tensorIO::output_matrix(gsl_matrix *M){
 	std::cout <<"::INFO::MATRIX::"<< std::endl;
 	for(int i=0;i<M->size2;i++){
 		for(int j=0;j<M->size1;j++)
-			std::cout << " " << gsl_matrix_get(M,j,i);
+			std::cout << " " << gsl_matrix_get(M,i,j);
 		std::cout << std::endl;	
 	}
 	std::cout << std::endl;

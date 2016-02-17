@@ -22,6 +22,48 @@ math_helper::gsl_cross3D(gsl_vector *a, gsl_vector *b, gsl_vector *c) { // shoul
 	gsl_vector_set(c,2,da[2]);
 }
 
+
+double
+math_helper::gsl_calc_orth(	gsl_vector *n2, gsl_vector *n1, gsl_vector *c2,
+				gsl_vector *c1, gsl_matrix *OS ) { // should rewrite in tensor notation
+
+	if( n1->size!=n2->size  || c1->size!=c2->size || OS->size1!=DIM && OS->size2!=DIM )
+		std::cout << "INFO:: CANNOT COMPUTE CROSS PRODUCTS" << std::endl;
+
+	gsl_vector *nh = gsl_vector_calloc(DIM);
+	gsl_vector *ph = gsl_vector_calloc(DIM);
+	gsl_vector *qh = gsl_vector_calloc(DIM);
+
+	gsl_vector_sub(n2,n1);
+	gsl_vector_sub(c2,c1);
+	gsl_vector_memcpy(nh,n2);
+	gsl_vector_memcpy(ph,c2);
+	double nl = gsl_blas_dnrm2(nh);
+	double pl = gsl_blas_dnrm2(ph);
+	gsl_vector_scale(nh,1.0/nl); gsl_vector_scale(ph,1.0/pl);
+
+	gsl_cross3D( nh, ph, qh );
+
+	double ql = gsl_blas_dnrm2(qh);			
+	gsl_vector_scale(qh, 1.0/ql );
+
+	gsl_cross3D( nh, qh, ph );
+
+	pl = gsl_blas_dnrm2(ph);
+	gsl_vector_scale(ph, -1.0/pl);
+
+	gsl_matrix_set_row(OS,0,nh);
+	gsl_matrix_set_row(OS,1,ph);
+	gsl_matrix_set_row(OS,2,qh);
+
+	gsl_vector_free(nh);
+	gsl_vector_free(ph);
+	gsl_vector_free(qh);
+
+	return nl;
+}
+
+
 std::string
 mmdb_helper::atom_type( char * aid ) {
 	std::string atom_str(aid);
@@ -80,41 +122,41 @@ map_manager::assign_map( std::string inp_str ) {
 }
 
 int	
-quaternion::assign_quaterion( gsl_vector *v, double angle ){ // angle in radians
-	if( v->size==3 ){
+quaternion::assign_quaterion( gsl_vector *v, double angle ){ 
+	// angle in radians
+	if( v->size==DIM ){
 
-		double norm, vx, vy, vz;
-		gsl_vector xo;
+		double norm=0.0;
 
-		vx = gsl_vector_get( v, XX );
-		vy = gsl_vector_get( v, YY );
-		vx = gsl_vector_get( v, ZZ );
+		double vx = gsl_vector_get( v, XX );
+		double vy = gsl_vector_get( v, YY );
+		double vz = gsl_vector_get( v, ZZ );
 
   		norm   = 1.0/sqrt(vx*vx+vy*vy+vz*vz);
 
-		double w=cos(angle*0.5);
-		double x=vx*norm*sin(angle*0.5);
-		double y=vy*norm*sin(angle*0.5);
-		double z=vz*norm*sin(angle*0.5);
+		double w = cos(angle*0.5);
+		double x = vx*norm*sin(angle*0.5);
+		double y = vy*norm*sin(angle*0.5);
+		double z = vz*norm*sin(angle*0.5);
 
 		gsl_vector_set ( q_ , XX , w );
 		gsl_vector_set ( q_ , YY , x );
 		gsl_vector_set ( q_ , ZZ , y );
 		gsl_vector_set ( q_ ,DIM , z );
 
-		gsl_matrix_set( R_, XX, XX, 1.0-2.0*(y*y+z*z) );
-		gsl_matrix_set( R_, XX, YY, 2*(x*y-z*w) );
-		gsl_matrix_set( R_, XX, ZZ, 2*(x*z+y*w) );
+		gsl_matrix_set( R_, XX, XX, 1.0-2.0*(y*y+z*z)	);
+		gsl_matrix_set( R_, XX, YY, 2*(x*y-z*w)		);
+		gsl_matrix_set( R_, XX, ZZ, 2*(x*z+y*w)		);
 
-		gsl_matrix_set( R_, YY, XX, 2*(x*y+z*w) );
-		gsl_matrix_set( R_, YY, YY, 1-2*(x*x+z*z) );
-		gsl_matrix_set( R_, YY, ZZ, 2*(y*z-x*w) );
+		gsl_matrix_set( R_, YY, XX, 2*(x*y+z*w)		);
+		gsl_matrix_set( R_, YY, YY, 1-2*(x*x+z*z)	);
+		gsl_matrix_set( R_, YY, ZZ, 2*(y*z-x*w)		);
 
-		gsl_matrix_set( R_, ZZ, XX, 2*(x*z-y*w) );
-		gsl_matrix_set( R_, ZZ, YY, 2*(y*z+x*w) );
-		gsl_matrix_set( R_, ZZ, ZZ, 1-2*(x*x+y*y) );
+		gsl_matrix_set( R_, ZZ, XX, 2*(x*z-y*w)		);
+		gsl_matrix_set( R_, ZZ, YY, 2*(y*z+x*w)		);
+		gsl_matrix_set( R_, ZZ, ZZ, 1-2*(x*x+y*y)	);
 
-		//R=[1-2*(y*y+z*z) 2*(x*y-z*w) 2*(x*z+y*w) ; 2*(x*y+z*w) 1-2*(x*x+z*z) 2*(y*z-x*w) ; 2*(x*z-y*w) 2*(y*z+x*w) 1-2*(x*x+y*y) ]
+		// R=[1-2*(y*y+z*z) 2*(x*y-z*w) 2*(x*z+y*w) ; 2*(x*y+z*w) 1-2*(x*x+z*z) 2*(y*z-x*w) ; 2*(x*z-y*w) 2*(y*z+x*w) 1-2*(x*x+y*y) ]
 
 		bSet_=true;
 
@@ -138,13 +180,24 @@ quaternion::rotate_particles( particles ps ) {
 	return 0;
 }
 
+void
+quaternion::print(){
+	if( is_complete() ){
+		tensorIO tIO;
+		std::cout << "INFO::QUATERNION" << std::endl;
+		tIO.output_vector( q_ );
+		tIO.output_matrix( R_ );
+	}
+}
+
 int
 quaternion::rotate_particles( particles ps , gsl_vector *v0 ) {
 	if( is_complete() ){
-		gsl_vector *tmp=gsl_vector_calloc(DIM);
+		gsl_vector *tmp = gsl_vector_calloc(DIM);
 		for(int i=0;i<ps.size();i++){
-			rotate_coord(ps[i].second);
-			gsl_vector_add(ps[i].second,v0);
+			gsl_vector_sub( ps[i].second, v0 );
+			rotate_coord  ( ps[i].second	 );
+			gsl_vector_add( ps[i].second, v0 );
 		}
 		gsl_vector_free(tmp);
 	}
@@ -171,9 +224,17 @@ quaternion::rotate_coord( gsl_vector *x )
 			xo[YY] = gsl_vector_get(x, YY); 
 			xo[ZZ] = gsl_vector_get(x, ZZ);
  
-			xX = (q[0]*q[0]+q[1]*q[1]-q[2]*q[2]-q[3]*q[3])*xo[XX] + (2*q[1]*q[2] - 2*q[0]*q[3])*xo[YY] + (2*q[1]*q[3] + 2*q[0]*q[2])*xo[ZZ];
-			yY = (2*q[1]*q[2] + 2*q[0]*q[3])*xo[XX] + (q[0]*q[0]-q[1]*q[1] + q[2]*q[2]-q[3]*q[3])*xo[YY] + (2*q[2]*q[3]-2*q[0]*q[1])*xo[ZZ];
-			zZ = (2*q[1]*q[3] - 2*q[0]*q[2])*xo[XX] + (2*q[2]*q[3] + 2*q[0]*q[1])*xo[YY] + (q[0]*q[0]-q[1]*q[1]-q[2]*q[2]+q[3]*q[3])*xo[ZZ];
+			xX = 	(q[0]*q[0] + q[1]*q[1]-q[2]*q[2]-q[3]*q[3] )	* xo[XX] + 
+				(2*q[1]*q[2] - 2*q[0]*q[3])			* xo[YY] + 
+				(2*q[1]*q[3] + 2*q[0]*q[2])			* xo[ZZ] ;
+
+			yY = 	(2*q[1]*q[2] + 2*q[0]*q[3])			* xo[XX] + 
+				(q[0]*q[0]-q[1]*q[1] + q[2]*q[2]-q[3]*q[3] )	* xo[YY] + 
+				(2*q[2]*q[3]-2*q[0]*q[1])			* xo[ZZ] ;
+
+			zZ = 	(2*q[1]*q[3] - 2*q[0]*q[2])			* xo[XX] + 
+			 	(2*q[2]*q[3] + 2*q[0]*q[1])			* xo[YY] + 
+			 	(q[0]*q[0]-q[1]*q[1]-q[2]*q[2] + q[3]*q[3] )	* xo[ZZ] ;
 
 			gsl_vector_set(x,XX,xX);
 			gsl_vector_set(x,YY,yY);

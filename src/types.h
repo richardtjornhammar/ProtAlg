@@ -78,20 +78,24 @@ namespace rich {
 	class math_helper {
 		public:
 			math_helper(){ bHelp_=false; };
-			void	gsl_cross3D( gsl_vector * , gsl_vector *, gsl_vector *);
+			void	gsl_cross3D( gsl_vector * , gsl_vector *, gsl_vector * );
+			double	gsl_calc_orth(	gsl_vector * , gsl_vector *, gsl_vector *,
+						gsl_vector * , gsl_matrix * );
 		private:
 			bool bHelp_;
 	};
 
 	class quaternion {
 		public:
-			inline	quaternion() { bSet_= false;  q_= gsl_vector_calloc(4); R_= gsl_matrix_calloc(DIM,DIM); };
-			void	clear(void)  { gsl_vector_set_zero(q_); bSet_= false; };
+			inline	quaternion() {	bSet_= false;  q_= gsl_vector_calloc(DIM+1); 
+						R_= gsl_matrix_calloc(DIM,DIM); };
+			void	clear(void)  {	gsl_vector_set_zero(q_); bSet_= false; };
 			int	assign_quaterion( gsl_vector *x, double angle );
 			int	rotate_coord	( gsl_vector *x );
 			int	rotate_particles( particles );
 			int	rotate_particles( particles , gsl_vector * );
-			bool	is_complete(){ return bSet_; };
+			void	print();
+			bool	is_complete() { return bSet_; };
 			~quaternion() {
     				gsl_vector_free( q_ );
 				gsl_matrix_free( R_ );
