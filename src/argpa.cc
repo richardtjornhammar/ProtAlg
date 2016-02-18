@@ -130,6 +130,7 @@ arg_parser::parse ( std::pair < int, char ** > mp ) {
 
 	if ( help==1 || failed==1 ) {
 		print_help( failed , ret_args );
+		ret_args.first = 1;
 	}
 
 	return ret_args;
@@ -162,7 +163,9 @@ arg_parser::parse ( std::pair < int, char ** > mp, std::vector < std::pair < int
 	int a_size = mp.first==1?2:mp.first;
 	int help=0;
 	while ( ++arg < a_size  ) {
-		if(  args[arg] == "-h" ||  args[arg] =="--h" || args[arg] =="--help" || args[arg] =="-help" || mp.first==1) {
+		if(	args[arg] == "-h" ||  args[arg] =="--h" 
+			|| args[arg] =="--help" || args[arg] =="-help" 
+			|| mp.first == 1 ) {
 			help=1;
 			break;
 		}else{
@@ -189,6 +192,7 @@ arg_parser::parse ( std::pair < int, char ** > mp, std::vector < std::pair < int
 
 	if ( help==1 || failed==1 ) {
 		print_help( failed , ret_args );
+		ret_args.first = 1;
 	}
 
 	return ret_args;

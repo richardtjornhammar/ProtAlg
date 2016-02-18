@@ -205,12 +205,12 @@ mat_io::write_gsl2dat ( gsl_matrix *A, std::string fstr ) {
 }
 
 int
-mat_io::write_vdbl2dat( std::vector<double> vdbl, std::string fstr ){
+mat_io::write_vdbl2dat( std::vector<std::pair<int,double> > vdbl, std::string fstr ){
 	const char *c_filename = fstr.c_str();
 	std::ofstream outf;
 	outf.open(c_filename);
 	for( int i=0 ; i<vdbl.size() ; i++ ) {
-		outf	<< " " << i << " " << vdbl[i] << std::endl; 
+		outf	<< " " << i << " " << vdbl[i].second << std::endl; 
 	}
 	outf.close();
 	return 0;

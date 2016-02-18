@@ -17,6 +17,9 @@
 #include <clipper/clipper-ccp4.h>
 #include <clipper/clipper-contrib.h>
 
+//	MMDB	STUFF
+#include "mmdb/mmdb_manager.h"
+
 #define XX	0
 #define YY	1
 #define ZZ	2
@@ -71,6 +74,7 @@ namespace rich {
 		public:
 			std::string	atom_type( char * );
 			std::string	atom_symb( char * );
+			int	update_residue	( int, int, int, CMMDBManager*, particles );
 		private:
 			;
 	};
@@ -78,9 +82,9 @@ namespace rich {
 	class math_helper {
 		public:
 			math_helper(){ bHelp_=false; };
-			void	gsl_cross3D( gsl_vector * , gsl_vector *, gsl_vector * );
-			double	gsl_calc_orth(	gsl_vector * , gsl_vector *, gsl_vector *,
-						gsl_vector * , gsl_matrix * );
+			void	gsl_cross3D	( gsl_vector * , gsl_vector *, gsl_vector * );
+			double	gsl_calc_orth	( gsl_vector * , gsl_vector *, gsl_vector *,
+						  gsl_vector * , gsl_matrix * );
 		private:
 			bool bHelp_;
 	};

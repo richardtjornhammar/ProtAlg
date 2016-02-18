@@ -20,7 +20,7 @@ namespace rich {
 			int bmp (	gsl_matrix * , std::string );
 			int proj(	gsl_matrix * , gsl_matrix * , clipper::Xmap<float> ,
 					gsl_matrix * , gsl_vector * , double , double,
-					std::vector<double> * );
+					std::vector< std::pair<int,double> > * );
 		private:
 			int nbins_;
 	};

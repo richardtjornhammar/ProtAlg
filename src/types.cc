@@ -63,6 +63,24 @@ math_helper::gsl_calc_orth(	gsl_vector *n2, gsl_vector *n1, gsl_vector *c2,
 	return nl;
 }
 
+int
+mmdb_helper::update_residue( int imod, int icha, int ires, CMMDBManager *mmdb0, particles residue ) {
+	PPCAtom	atoms;
+	int 	nAtoms;
+
+	mmdb0->GetAtomTable    ( imod ,icha ,ires , atoms, nAtoms );
+
+	if( nAtoms == residue.size() ) {
+		for (int k=0;k<nAtoms;k++){
+			atoms[k]->x=gsl_vector_get(residue[k].second,XX);
+			atoms[k]->y=gsl_vector_get(residue[k].second,YY);
+			atoms[k]->z=gsl_vector_get(residue[k].second,ZZ);
+		}
+		return 0;
+	}else{
+		return 1;
+	}
+}
 
 std::string
 mmdb_helper::atom_type( char * aid ) {

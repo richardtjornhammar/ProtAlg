@@ -3,6 +3,7 @@
 #include <string>
 #include <fstream>
 #include <vector>
+#include <algorithm>
 #include <sstream>
 #include <math.h>
 #include <cstdlib>
@@ -43,6 +44,11 @@ fatal(void) {
 	exit(1);
 }
 
+bool compare_pid ( std::pair< int , double > pid1 ,
+		   std::pair< int , double > pid2 ) {
+	return( pid1.second < pid2.second ) ; 
+};
+
 int main ( int argc, char ** argv ) {
 	int verbose = 0;
 
@@ -59,8 +65,8 @@ int main ( int argc, char ** argv ) {
 	vipss.first=0;	vipss.second.first = "-dfile"; 
 			vipss.second.second = "d_default.mtz";
 	opts_n_defaults.push_back(vipss);
-	vipss.first=0;	vipss.second.first = "-model";
-			vipss.second.second = "10";
+	vipss.first=0;	vipss.second.first = "-nbins";
+			vipss.second.second = "24";
 	opts_n_defaults.push_back(vipss);
 	vipss.first=0;	vipss.second.first = "-verbose";
 			vipss.second.second = "0";
@@ -69,20 +75,22 @@ int main ( int argc, char ** argv ) {
 //	EXECUTING ARGPARSE
 	rich::arg_parser parser;
 	std::pair<int, std::vector< std::string > > run_args = parser.parse( margs, opts_n_defaults );
-	if(run_args.first) { // FAILED
+	if( run_args.first ) { 
 		fatal();
 	}
 
 //	HERE WE SHOULD SET THE INPUT PARAMETERS
 	verbose		= atoi(run_args.second[3].c_str());
 	std::cout << "INFO:: SETTING VERBOSE LEVEL "<< verbose << std::endl;
+	int NBINS_IO 	= atoi(run_args.second[2].c_str());
+	std::cout << "INFO:: SETTING NBINS " << NBINS_IO << std::endl;
 
 	rich::map_manager mmap;
 	int rv = mmap.assign_map( run_args.second[1] );
 	clipper::Xmap<float> density = mmap.get_map();
 
 //	THIS TOOL CURRENTLY ONLY FOR PDB
-	CMMDBManager   mmdb;
+	CMMDBManager   mmdb, mmdb_N;
 	int itype, otype;
 	itype = MMDB_FILE_PDB;
 
@@ -106,11 +114,12 @@ int main ( int argc, char ** argv ) {
 	std::strcpy (cpstr, run_args.second[0].c_str() );
 	int rval	= mmdb.ReadPDBASCII( cpstr );	//	READ PDB
 	if(rval!=0) {
-		fatal(  );
+		fatal( );
 	}
 
 //	START TO WORK WITH THE DATA (TABLES)
-	PPCModel	model_T;
+	PPCModel	model_T, model_N;
+	PCModel		model;
 	PPCChain	chain_T;
 	PPCResidue	resid_T;
 	PPCAtom		atoms_T,atoms_T2;
@@ -119,6 +128,11 @@ int main ( int argc, char ** argv ) {
 	int		imod,icha,ires,iat;
 
 	mmdb.GetModelTable( model_T, nModels );
+	model = newCModel(	);
+	model->Copy( model_T[0] );
+	mmdb_N.AddModel(  model );
+	int NM=1;
+
 	std::cout << "INFO:: HAVE " << nModels << " MODELS" << std::endl;
 	int nErr=0;
 
@@ -136,9 +150,13 @@ int main ( int argc, char ** argv ) {
 	gsl_vector *ph = gsl_vector_calloc(DIM);
 	gsl_vector *qh = gsl_vector_calloc(DIM);
 
-	std::vector<double> theta;
-	for ( int i=0 ; i<360 ; i++ )
-		theta.push_back(0.0);
+	std::vector< std::pair<int,double> > theta;
+	int Ntheta=NBINS_IO;
+	for ( int i=0 ; i<Ntheta ; i++ ) {
+		std::pair< int, double > pid;
+		pid.first=i; pid.second=0.0;
+		theta.push_back(pid);
+	}
 
 	for ( imod=1 ; imod<=nModels ; imod++ ) {
 		nChains = mmdb.GetNumberOfChains( imod ); 
@@ -147,7 +165,6 @@ int main ( int argc, char ** argv ) {
 			rich::particles residue_atoms;
 			for ( ires = 0 ; ires < nResidues ; ires++ ) { 
 				residue_atoms.clear();
-
 				mmdb.GetAtomTable    ( imod ,icha ,ires , atoms_T, nAtoms );
 				if( ires<nResidues-1 ) {
 					mmdb.GetAtomTable    ( imod ,icha ,ires+1 , atoms_T2, nAtoms2 );
@@ -156,9 +173,9 @@ int main ( int argc, char ** argv ) {
 					gsl_vector_set(n2,ZZ,atoms_T2[0]->z);
 				}
 
-				gsl_matrix *A	= gsl_matrix_calloc( nAtoms,	 DIM);
-				gsl_matrix *V	= gsl_matrix_calloc( DIM,	 DIM);
-				gsl_matrix *OS	= gsl_matrix_calloc( DIM,	 DIM);
+				gsl_matrix *A	= gsl_matrix_calloc( nAtoms,	DIM);
+				gsl_matrix *V	= gsl_matrix_calloc( DIM,	DIM);
+				gsl_matrix *OS	= gsl_matrix_calloc( DIM,	DIM);
 				gsl_vector *S	= gsl_vector_calloc( DIM );
 				gsl_vector *wrk	= gsl_vector_calloc( DIM );
 
@@ -207,7 +224,7 @@ int main ( int argc, char ** argv ) {
 
 //			CALULATE PROJECTION
 				rich::calc_map cmap;
-				int nb = cmap.set_nbins(20);
+				int nb = cmap.set_nbins(NBINS_IO);
 				gsl_matrix *P  = gsl_matrix_calloc(nb,nb);
 				gsl_matrix *CN = gsl_matrix_calloc(nb,nb);
 
@@ -218,22 +235,58 @@ int main ( int argc, char ** argv ) {
 					fatal();
 				}
 
-				if( ires == 40 && icha==0 ) { // TESTCASE
-					rich::mat_io mIO;
-					mIO.write_gsl2datn( P, CN, "testproj.dat"  );
-					mIO.write_vdbl2dat( theta, "testTheta.dat" );
+				if( ires == 40 && icha==0 ) {		// TESTCASE
+				//if( 1 ) {
+					if( verbose ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
+						rich::mat_io mIO;
+						mIO.write_gsl2datn( P, CN, "testproj.dat"  );
+						mIO.write_vdbl2dat( theta, "testTheta.dat" );
+					}
+					std::sort( theta.begin(), theta.end(), compare_pid );
+					double val=100.0, alimit=0.5;
+					std::vector<double> v_ang;
+					do {
+						val		= theta.back().second		/ (float(NBINS_IO));
+						double ang	= theta.back().first  * 360.0	/ (float(NBINS_IO));
+						if(verbose)
+							std::cout << "INFO::MAX > " << ang << " " << val << std::endl;
+						if( val > alimit )
+							v_ang.push_back(ang);
+						theta.pop_back();
+					} while( val > alimit ) ;
+					rich::fileIO	fIO;
 					gsl_matrix_get_row( nh, OS, 0 );
-					rich::quaternion q;
-					q.assign_quaterion( nh , 240*M_PI/180.0 );
-					q.rotate_particles( residue_atoms , v0 );
-					rich::fileIO fIO;
-					fIO.output_pdb("rotres.pdb", residue_atoms );
 
+					if( v_ang.size() < 1)
+						continue;
+
+					for(int i_ang=0; i_ang < v_ang.size() ; i_ang++) {
+						model = newCModel(	);
+						mmdb_N.AddModel( model  ); 
+						NM++;
+						model->Copy( model_T[0] );
+
+						rich::quaternion q;
+						double fi = (i_ang==0)?( v_ang[i_ang] ):(v_ang[i_ang]-v_ang[i_ang-1]);
+						q.assign_quaterion( nh , v_ang[i_ang] * M_PI/180.0 );
+						q.rotate_particles( residue_atoms , v0 );
+
+						if( mmhelp.update_residue( NM ,icha ,ires, &mmdb_N, residue_atoms ) ) {
+							std::cout << "::ERROR::" << std::endl;
+							fatal();
+						}
+
+						if( verbose ) {
+							fIO.output_pdb( "rotres" + std::to_string(i_ang) + ".pdb" , residue_atoms );
+						}
+
+					}
 					if ( verbose ) { 
 						std::vector<std::string> vs;
-						vs.push_back("Ga"); vs.push_back("In"); vs.push_back("Fe");
+						vs.push_back("Ga"); 
+						vs.push_back("In"); 
+						vs.push_back("Sn");
 						fIO.output_pdb("system.pdb", OS, vs);
-
 						rich::tensorIO tIO;
 						rich::quaternion q_test;
 						gsl_vector *rx = gsl_vector_calloc(DIM);
@@ -265,6 +318,11 @@ int main ( int argc, char ** argv ) {
 			}
 		}
 	}
+
+	mmdb_N.GetModelTable( model_T, nModels );
+	std::cout << "INFO::GENERATED "<<nModels<<" MODELS"<< NM << std::endl;
+	mmdb_N.FinishStructEdit();
+	mmdb_N.WritePDBASCII( "multistate.pdb" );
 
 	return 0;
 }

@@ -19,12 +19,10 @@ using namespace rich;
 int
 calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS, 
 		gsl_matrix *OS, gsl_vector *origo,
-		double RC , double ZC, std::vector<double> * theta ) {
+		double RC , double ZC, std::vector< std::pair<int,double> > * theta ) {
 
-	if(theta->size()!=360)
-		return 1;
-	for(int i=0;i<360;i++)
-		(*(theta))[i]=0.0;
+	for(int i=0;i<theta->size();i++)
+		(*(theta))[i].second=0.0;
 
 	int verbose = 0;
 	gsl_vector *rvec	= gsl_vector_calloc(DIM);
@@ -48,21 +46,21 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 	clipper::Xmap_base::Map_reference_index	ix;
 	clipper::Coord_grid	cg0;
 	clipper::Coord_orth	co0;
-
-	double x=0,y=0,z=0;
+	double Ntheta  = theta->size();
+	double x = 0,y = 0,z = 0;
 	for ( ix = EDENS.first(); !ix.last(); ix.next() ) {
 		double v0	= EDENS[ix];
-		double r2	= (x*x+y*y);
 		cg0		= ix.coord();
 		co0		= ix.coord_orth();
 		clipper::Coord_orth rtmp;
 		rtmp = co0-o0;
-		gsl_vector_set( rvec, XX, rtmp.x() );
-		gsl_vector_set( rvec, YY, rtmp.y() );
-		gsl_vector_set( rvec, ZZ, rtmp.z() );
+		gsl_vector_set( rvec, XX , rtmp.x() );
+		gsl_vector_set( rvec, YY , rtmp.y() );
+		gsl_vector_set( rvec, ZZ , rtmp.z() );
 		gsl_blas_ddot ( rvec, xh , &x );
 		gsl_blas_ddot ( rvec, yh , &y );
 		gsl_blas_ddot ( rvec, zh , &z );
+		double r2	= (x*x+y*y); // PROJECTED
 		if( r2 < RC*RC && z<ZC && z>0.0 ) {
 			double	res   	 = atan2(y,x)*180.0/M_PI+180.0;
 			int	ires 	 = floor(res);
@@ -74,8 +72,9 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 				std::cout << ires  << " "<< v0 << std::endl;
 			}
 
-			if(ires>=0&&ires<360&&r2>RC*RC*0.25)
-				(*(theta))[ires]	+= v0*v0;
+			int itheta = floor(res/360.0*Ntheta);
+			if(itheta>=0&&itheta<Ntheta&&r2>RC*RC*0.25)
+				(*(theta))[itheta].second	+= v0*v0;
  
 			int I = floor( 0.5*(x/RC+1.0)*nbins_ );
 			int J = floor( 0.5*(y/RC+1.0)*nbins_ );

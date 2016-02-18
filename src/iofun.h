@@ -46,9 +46,9 @@ namespace rich {
 
 	class mat_io {
 		public:
-			int write_gsl2dat  ( gsl_matrix *, std::string );
-			int write_gsl2datn ( gsl_matrix *, gsl_matrix *, std::string );
-			int write_vdbl2dat ( std::vector<double> , std::string );
+			int write_gsl2dat	( gsl_matrix *, std::string );
+			int write_gsl2datn	( gsl_matrix *, gsl_matrix *, std::string );
+			int write_vdbl2dat 	( std::vector< std::pair<int,double> > , std::string );
 		private:
 			int N_;
 	};
