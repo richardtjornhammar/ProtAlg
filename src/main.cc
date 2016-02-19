@@ -133,6 +133,53 @@ int main ( int argc, char ** argv ) {
 	mmdb_N.AddModel(  model );
 	int NM=1;
 
+//	CRYSTAL CELL STUFF
+	int RC;
+	if (mmdb.isSpaceGroup() && !(mmdb_N.isSpaceGroup()) )  {
+		// space group name is for demonstration only
+		RC = mmdb_N.SetSpaceGroup ( mmdb.GetSpaceGroup () );
+		if (RC!=SYMOP_Ok)   {
+			switch (RC)  {
+				case SYMOP_NoLibFile :
+					printf ( " **** error: can't find symop.lib\n" );
+					break;
+				case SYMOP_UnknownSpaceGroup :
+					printf ( " **** error: attempt to set up unknown space group\n" );
+					break;
+				case SYMOP_NoSymOps :
+					printf ( " **** error: no symmetry operations found\n" );
+					break;
+				default :
+					printf ( " **** error: unknown return code from "
+					"CMMDBManager::SetSpaceGroup()\n" );
+				}
+			exit(2);
+		}
+		std::cout << "INFO::ASSIGNED SYM. INFORMATION"<< std::endl;
+	}
+	if (mmdb.isCrystInfo())  {
+		// numerical values are for demonstration only
+		double cell[8];
+		int OC[0];
+    		mmdb.GetCell ( cell[0], cell[1], cell[2], cell[3] , cell[4] , cell[5] , cell[6] , OC[0] );
+		mmdb_N.SetCell ( cell[0], cell[1], cell[2], cell[3] , cell[4] , cell[5] , OC[0] );
+		std::cout << "INFO::ASSIGNED CELL INFORMATION"<< std::endl;
+	}
+	RC = mmdb_N.CrystReady();
+	if (RC>0)  {
+		if (RC & CRRDY_NotPrecise)
+			std::cout << "WARNING:: 1 \n" ;
+		if (RC & CRRDY_isTranslation)
+			std::cout << "WARNING:: 2 \n" ;
+		if (RC & CRRDY_NoOrthCode)
+			std::cout << "WARNING:: 3 \n" ;
+	}
+	RC = mmdb_N.GenerateSymMates ( NULL );
+	if (RC>0)  {
+		std::cout << "WARNING:: " << RC <<" \n" ;
+	}
+//	MOD MANAGER HAS CELL AND SYM
+
 	std::cout << "INFO:: HAVE " << nModels << " MODELS" << std::endl;
 	int nErr=0;
 
@@ -164,20 +211,27 @@ int main ( int argc, char ** argv ) {
 			nResidues = mmdb.GetNumberOfResidues( imod , icha ); 
 			rich::particles residue_atoms;
 			for ( ires = 0 ; ires < nResidues ; ires++ ) { 
+
+				int skip_res = 0;
 				residue_atoms.clear();
+
 				mmdb.GetAtomTable    ( imod ,icha ,ires , atoms_T, nAtoms );
 				if( ires<nResidues-1 ) {
-					mmdb.GetAtomTable    ( imod ,icha ,ires+1 , atoms_T2, nAtoms2 );
-					gsl_vector_set(n2,XX,atoms_T2[0]->x);
-					gsl_vector_set(n2,YY,atoms_T2[0]->y);
-					gsl_vector_set(n2,ZZ,atoms_T2[0]->z);
+					mmdb.GetAtomTable ( imod ,icha ,ires+1 , atoms_T2, nAtoms2 );
+					gsl_vector_set( n2, XX, atoms_T2[0]->x );
+					gsl_vector_set( n2, YY, atoms_T2[0]->y );
+					gsl_vector_set( n2, ZZ, atoms_T2[0]->z );
+					skip_res++;
 				}
 
-				gsl_matrix *A	= gsl_matrix_calloc( nAtoms,	DIM);
-				gsl_matrix *V	= gsl_matrix_calloc( DIM,	DIM);
-				gsl_matrix *OS	= gsl_matrix_calloc( DIM,	DIM);
-				gsl_vector *S	= gsl_vector_calloc( DIM );
-				gsl_vector *wrk	= gsl_vector_calloc( DIM );
+				int nb = NBINS_IO;
+				gsl_matrix *P	= gsl_matrix_calloc(	nb, nb	 );
+				gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
+				gsl_matrix *A	= gsl_matrix_calloc( nAtoms, DIM );
+				gsl_matrix *V	= gsl_matrix_calloc( DIM, DIM	 );
+				gsl_matrix *OS	= gsl_matrix_calloc( DIM, DIM	 );
+				gsl_vector *S	= gsl_vector_calloc(	DIM 	 );
+				gsl_vector *wrk	= gsl_vector_calloc(	DIM	 );
 
 				gsl_vector *v0 = gsl_vector_calloc(DIM);
 
@@ -201,19 +255,30 @@ int main ( int argc, char ** argv ) {
 					gsl_vector_memcpy(res_atom.second,vt);
 					residue_atoms.push_back(res_atom);
 
-					if( atype=="CA" )
+					if( atype=="C" && etype=="C" ) {	// CA
 						gsl_vector_memcpy(c1,vt);
-					if( atype=="CB" )
+						skip_res++;
+					}
+					if( atype=="O" && etype=="O" ) {	// CB NOT GLY
 						gsl_vector_memcpy(c2,vt);
-					if( atype=="N" && etype=="N" )
+						skip_res++;
+					}
+					if( atype=="N" && etype=="N" ) {
 						gsl_vector_memcpy(n1,vt);
-					if( ires>=nResidues-1 )
-						if( atype=="C" && etype=="C" )
+						skip_res++;
+					}
+					if( ires>=nResidues-1 ) {
+						if( atype=="C" && etype=="C" ) {
 							gsl_vector_memcpy(n2,vt);
-
+							skip_res++;
+						}
+					}
 					gsl_matrix_set_row(A,iat,vt);
 				}
-
+				if(skip_res!=4) {
+					std::cout << "INFO::SKIPPING RESIDUE "<< ires << " HAS " << skip_res << std::endl;
+					continue;
+				}
 //			CALCULATE ORTHONORMAL SYSTEM
 				rich::math_helper mah;
 				double zc = mah.gsl_calc_orth( n2, n1, c2, c1, OS );
@@ -222,38 +287,38 @@ int main ( int argc, char ** argv ) {
 				gsl_linalg_SV_decomp(A,V,S,wrk);
 				double rc = sqrt(gsl_vector_get(S,0))*0.5;
 
+//			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
 //			CALULATE PROJECTION
 				rich::calc_map cmap;
-				int nb = cmap.set_nbins(NBINS_IO);
-				gsl_matrix *P  = gsl_matrix_calloc(nb,nb);
-				gsl_matrix *CN = gsl_matrix_calloc(nb,nb);
-
+				cmap.set_nbins(nb);
 				if( cmap.proj(	P , CN , density ,
 						OS , v0 , rc , zc,
 						&theta ) ) {
 					std::cout << "ERROR::FAILED" << std::endl;
 					fatal();
 				}
-
-				if( ires == 40 && icha==0 ) {		// TESTCASE
-				//if( 1 ) {
+				//if( ires == 40 && icha==0 ) {	// TESTCASE
+				if( 1 ) {
 					if( verbose ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
 						rich::mat_io mIO;
 						mIO.write_gsl2datn( P, CN, "testproj.dat"  );
 						mIO.write_vdbl2dat( theta, "testTheta.dat" );
 					}
+
 					std::sort( theta.begin(), theta.end(), compare_pid );
-					double val=100.0, alimit=0.5;
+					double val = 100.0, alimit = 7E-2;
 					std::vector<double> v_ang;
+					int Ith = theta.size();
 					do {
-						val		= theta.back().second		/ (float(NBINS_IO));
-						double ang	= theta.back().first  * 360.0	/ (float(NBINS_IO));
-						if(verbose)
-							std::cout << "INFO::MAX > " << ang << " " << val << std::endl;
+						val		= theta[Ith-1].second		/ sqrt(float(NBINS_IO));
+						double ang	= theta[Ith-1].first  * 360.0	/ (float(NBINS_IO));
+						if( verbose )
+							std::cout << "INFO::MAX > " << Ith << " " << ang << " " << val << std::endl;
 						if( val > alimit )
 							v_ang.push_back(ang);
-						theta.pop_back();
-					} while( val > alimit ) ;
+						Ith--;
+					} while( val > alimit && Ith>=0 ) ;
+
 					rich::fileIO	fIO;
 					gsl_matrix_get_row( nh, OS, 0 );
 
@@ -262,8 +327,6 @@ int main ( int argc, char ** argv ) {
 
 					for(int i_ang=0; i_ang < v_ang.size() ; i_ang++) {
 						model = newCModel(	);
-						mmdb_N.AddModel( model  ); 
-						NM++;
 						model->Copy( model_T[0] );
 
 						rich::quaternion q;
@@ -271,16 +334,22 @@ int main ( int argc, char ** argv ) {
 						q.assign_quaterion( nh , v_ang[i_ang] * M_PI/180.0 );
 						q.rotate_particles( residue_atoms , v0 );
 
-						if( mmhelp.update_residue( NM ,icha ,ires, &mmdb_N, residue_atoms ) ) {
-							std::cout << "::ERROR::" << std::endl;
-							fatal();
+						if( mmhelp.check_clash( NM, icha, ires, &mmdb_N, residue_atoms, 1.0 ) > 1 ) {
+							if(verbose)
+								std::cout << "INFO::WE HAVE CLASH" << std::endl;
+						} else {
+							NM++;
+							mmdb_N.AddModel( model  ); 
+							if( mmhelp.update_residue( NM ,icha ,ires, &mmdb_N, residue_atoms ) ) {
+								std::cout << "::ERROR::" << std::endl;
+								fatal();
+							}
 						}
-
 						if( verbose ) {
 							fIO.output_pdb( "rotres" + std::to_string(i_ang) + ".pdb" , residue_atoms );
 						}
-
 					}
+
 					if ( verbose ) { 
 						std::vector<std::string> vs;
 						vs.push_back("Ga"); 
@@ -310,11 +379,13 @@ int main ( int argc, char ** argv ) {
 				}
 
 				gsl_matrix_free( P );
+				gsl_matrix_free( CN );
 				gsl_matrix_free( A );
 				gsl_matrix_free( V );
 				gsl_matrix_free( OS );
 				gsl_vector_free( S );
 				gsl_vector_free( wrk );
+
 			}
 		}
 	}
@@ -323,7 +394,7 @@ int main ( int argc, char ** argv ) {
 	std::cout << "INFO::GENERATED "<<nModels<<" MODELS"<< NM << std::endl;
 	mmdb_N.FinishStructEdit();
 	mmdb_N.WritePDBASCII( "multistate.pdb" );
-
+	std::cout <<"INFO>> " << 0/1E-10 << std::endl;
 	return 0;
 }
 

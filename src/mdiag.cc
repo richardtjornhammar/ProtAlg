@@ -10,9 +10,7 @@
 
 //	GSL	STUFF
 #include <gsl/gsl_matrix.h>
-//#include <gsl/gsl_blas.h>
-//#include <gsl/gsl_linalg.h>
-//#include <gsl/gsl_permutation.h>
+
 
 using namespace rich;
 
@@ -21,8 +19,12 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 		gsl_matrix *OS, gsl_vector *origo,
 		double RC , double ZC, std::vector< std::pair<int,double> > * theta ) {
 
-	for(int i=0;i<theta->size();i++)
-		(*(theta))[i].second=0.0;
+	std::vector<double> fi_cnt;
+	for(int i=0;i<theta->size();i++){
+		(*(theta))[i].first	= i;
+		(*(theta))[i].second	= 0.0;
+		fi_cnt.push_back(1E-10);
+	}
 
 	int verbose = 0;
 	gsl_vector *rvec	= gsl_vector_calloc(DIM);
@@ -73,9 +75,10 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 			}
 
 			int itheta = floor(res/360.0*Ntheta);
-			if(itheta>=0&&itheta<Ntheta&&r2>RC*RC*0.25)
-				(*(theta))[itheta].second	+= v0*v0;
- 
+			if( itheta>=0 && itheta<Ntheta ){ // &&r2>RC*RC*0.25)
+				(*(theta))[itheta].second	+= sqrt(v0*v0);
+				fi_cnt[itheta]+=1.0;
+ 			}
 			int I = floor( 0.5*(x/RC+1.0)*nbins_ );
 			int J = floor( 0.5*(y/RC+1.0)*nbins_ );
 			if(I>=0&&I<nbins_&&J>=0&&J<nbins_) {
@@ -88,6 +91,9 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 				gsl_matrix_set( C, I, J, cval );
 			}
 		}
+	}
+	for(int i=0;i<theta->size();i++){
+		(*(theta))[i].second/=fi_cnt[i];
 	}
 
 	return 0;

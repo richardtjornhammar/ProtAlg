@@ -75,6 +75,7 @@ namespace rich {
 			std::string	atom_type( char * );
 			std::string	atom_symb( char * );
 			int	update_residue	( int, int, int, CMMDBManager*, particles );
+			int	check_clash	( int, int, int, CMMDBManager*, particles , double );
 		private:
 			;
 	};

@@ -64,6 +64,43 @@ math_helper::gsl_calc_orth(	gsl_vector *n2, gsl_vector *n1, gsl_vector *c2,
 }
 
 int
+mmdb_helper::check_clash( int imod, int icha, int iRes, CMMDBManager *MMDB, particles residue, double clashdist ) {
+
+	PPCAtom		SelAtom;
+	int		RC,selHnd,nSelAtoms,nAtoms;
+ 	int		nRes = MMDB->GetNumberOfResidues(imod,icha);
+
+	nAtoms = residue.size();
+ 	selHnd = MMDB->NewSelection();
+	for ( int k=0 ; k<nAtoms ; k++ ) {
+		double x = gsl_vector_get( residue[k].second, XX );
+		double y = gsl_vector_get( residue[k].second, YY );
+		double z = gsl_vector_get( residue[k].second, ZZ );
+		MMDB->Select (
+			selHnd,
+			STYPE_ATOM,
+			imod,			// MODEL
+			"*",			// CHAINS
+     			ANY_RES	,"*",		// RESNR,
+     			ANY_RES ,"*",		// INSCODE
+     			"*",			// RESNAME
+     			"*",			// ATOMNAME
+     			"*",			// ATOMTYPES
+     			"*",			// LOCINDICATOR
+     			"*",			// SEGMENT
+     			"*",			// CHARGES
+     			-1.0,-1.0,		// OCCUPANCY (ANY)
+     			x, y, z, clashdist,	// SPHERE
+     			SKEY_OR      		// OR-selection
+		);
+	}
+	MMDB->GetSelIndex ( selHnd, SelAtom, nSelAtoms );
+	
+	return nSelAtoms;
+}
+
+
+int
 mmdb_helper::update_residue( int imod, int icha, int ires, CMMDBManager *mmdb0, particles residue ) {
 	PPCAtom	atoms;
 	int 	nAtoms;
