@@ -190,6 +190,9 @@ int main ( int argc, char ** argv ) {
 	gsl_vector *n2 = gsl_vector_calloc(DIM);
 	gsl_vector *c1 = gsl_vector_calloc(DIM);
 	gsl_vector *c2 = gsl_vector_calloc(DIM);
+	gsl_vector *ca = gsl_vector_calloc(DIM);
+	gsl_vector *cb = gsl_vector_calloc(DIM);
+	gsl_vector *cg = gsl_vector_calloc(DIM);
 	gsl_vector *vt = gsl_vector_calloc(DIM);
 
 //	ORTHONORMAL SYSTEM STORAGE
@@ -204,7 +207,7 @@ int main ( int argc, char ** argv ) {
 		pid.first=i; pid.second=0.0;
 		theta.push_back(pid);
 	}
-
+	int nb = NBINS_IO;
 	for ( imod=1 ; imod<=nModels ; imod++ ) {
 		nChains = mmdb.GetNumberOfChains( imod ); 
 		for ( icha = 0 ; icha < nChains ; icha++ ) { 
@@ -212,99 +215,41 @@ int main ( int argc, char ** argv ) {
 			rich::particles residue_atoms;
 			for ( ires = 0 ; ires < nResidues ; ires++ ) { 
 
-				int skip_res = 0;
-				residue_atoms.clear();
+				rich::residue_helper rh;
+				double rc = rh.analyze_stage1( imod, icha, ires, &mmdb, nb , &residue_atoms );
+				double zc = rh.calc_OS();			// CALCULATE ORTHONORMAL SYSTEM
+				gsl_matrix *OS	= gsl_matrix_calloc( DIM, DIM );
+				rh.copyOS(OS);
 
-				mmdb.GetAtomTable    ( imod ,icha ,ires , atoms_T, nAtoms );
-				if( ires<nResidues-1 ) {
-					mmdb.GetAtomTable ( imod ,icha ,ires+1 , atoms_T2, nAtoms2 );
-					gsl_vector_set( n2, XX, atoms_T2[0]->x );
-					gsl_vector_set( n2, YY, atoms_T2[0]->y );
-					gsl_vector_set( n2, ZZ, atoms_T2[0]->z );
-					skip_res++;
-				}
-
-				int nb = NBINS_IO;
-				gsl_matrix *P	= gsl_matrix_calloc(	nb, nb	 );
-				gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
-				gsl_matrix *A	= gsl_matrix_calloc( nAtoms, DIM );
-				gsl_matrix *V	= gsl_matrix_calloc( DIM, DIM	 );
-				gsl_matrix *OS	= gsl_matrix_calloc( DIM, DIM	 );
-				gsl_vector *S	= gsl_vector_calloc(	DIM 	 );
-				gsl_vector *wrk	= gsl_vector_calloc(	DIM	 );
-
-				gsl_vector *v0 = gsl_vector_calloc(DIM);
-
-				for (iat = 0; iat<nAtoms ; iat++ ) {
-
-					char a_inf[256];
-					atoms_T[iat]->GetAtomID(a_inf);
-					std::string atype = mmhelp.atom_type(a_inf);
-					std::string etype = mmhelp.atom_symb(a_inf);
-
-					gsl_vector_set(vt,XX,atoms_T[iat]->x);
-					gsl_vector_set(vt,YY,atoms_T[iat]->y);
-					gsl_vector_set(vt,ZZ,atoms_T[iat]->z);
-
-					if(iat==0)
-						gsl_vector_memcpy(v0,vt);
-
-					rich::particle res_atom;
-					res_atom.second = gsl_vector_alloc(DIM);
-					res_atom.first  = etype; 
-					gsl_vector_memcpy(res_atom.second,vt);
-					residue_atoms.push_back(res_atom);
-
-					if( atype=="C" && etype=="C" ) {	// CA
-						gsl_vector_memcpy(c1,vt);
-						skip_res++;
-					}
-					if( atype=="O" && etype=="O" ) {	// CB NOT GLY
-						gsl_vector_memcpy(c2,vt);
-						skip_res++;
-					}
-					if( atype=="N" && etype=="N" ) {
-						gsl_vector_memcpy(n1,vt);
-						skip_res++;
-					}
-					if( ires>=nResidues-1 ) {
-						if( atype=="C" && etype=="C" ) {
-							gsl_vector_memcpy(n2,vt);
-							skip_res++;
-						}
-					}
-					gsl_matrix_set_row(A,iat,vt);
-				}
-				if(skip_res!=4) {
-					std::cout << "INFO::SKIPPING RESIDUE "<< ires << " HAS " << skip_res << std::endl;
-					continue;
-				}
-//			CALCULATE ORTHONORMAL SYSTEM
-				rich::math_helper mah;
-				double zc = mah.gsl_calc_orth( n2, n1, c2, c1, OS );
-
-//			CALCULATE LIMITS
-				gsl_linalg_SV_decomp(A,V,S,wrk);
-				double rc = sqrt(gsl_vector_get(S,0))*0.5;
+				//gsl_matrix *O2	= gsl_matrix_calloc( DIM, DIM	 );
+				//gsl_matrix *O3	= gsl_matrix_calloc( DIM, DIM	 );
+				//rich::math_helper mah;
+				//double zc = mah.gsl_calc_orth( n2, n1, c2, c1, OS );
+				//double z2 = mah.gsl_calc_orth( cb, ca, n2, n1, O2 );
+				//double z3 = mah.gsl_calc_orth( cg, cb, n2, n1, O3 );
 
 //			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
 //			CALULATE PROJECTION
 				rich::calc_map cmap;
 				cmap.set_nbins(nb);
+				gsl_vector *v0  = gsl_vector_calloc(DIM);
+				rh.copyv0(v0);
+				gsl_matrix *P	= gsl_matrix_calloc(	nb, nb	 );
+				gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
 				if( cmap.proj(	P , CN , density ,
 						OS , v0 , rc , zc,
 						&theta ) ) {
 					std::cout << "ERROR::FAILED" << std::endl;
 					fatal();
 				}
-				//if( ires == 40 && icha==0 ) {	// TESTCASE
-				if( 1 ) {
+
+				if( ires == 40 && icha==0 ) {	// TESTCASE
+				//if( 1 ) {
 					if( verbose ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
 						rich::mat_io mIO;
 						mIO.write_gsl2datn( P, CN, "testproj.dat"  );
 						mIO.write_vdbl2dat( theta, "testTheta.dat" );
 					}
-
 					std::sort( theta.begin(), theta.end(), compare_pid );
 					double val = 100.0, alimit = 7E-2;
 					std::vector<double> v_ang;
@@ -372,12 +317,12 @@ int main ( int argc, char ** argv ) {
 					}
 				}
 
-				if(verbose) {
-					rich::tensorIO tIO;
-					tIO.output_matrix(OS); tIO.output_matrix(V);
-					tIO.output_vector(nh);
-				}
-
+			//	if(verbose) {
+			//		rich::tensorIO tIO;
+			//		tIO.output_matrix(OS); tIO.output_matrix(V);
+			//		tIO.output_vector(nh);
+			//	}
+/*
 				gsl_matrix_free( P );
 				gsl_matrix_free( CN );
 				gsl_matrix_free( A );
@@ -385,7 +330,7 @@ int main ( int argc, char ** argv ) {
 				gsl_matrix_free( OS );
 				gsl_vector_free( S );
 				gsl_vector_free( wrk );
-
+*/
 			}
 		}
 	}

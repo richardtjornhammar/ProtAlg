@@ -137,6 +137,15 @@ mmdb_helper::atom_symb( char * aid ) {
 	return atype;
 }
 
+std::string
+mmdb_helper::atom_resn( char * aid ) {
+	std::string atom_str(aid);
+	std::size_t found0	= atom_str.find_last_of ("(");
+	std::size_t found1	= atom_str.find_first_of(")");
+	std::string atype	= atom_str.substr(found0+1,found1-1-found0);
+	return atype;
+}
+
 ////fft_reso = clipper::Resolution(1.0/sqrt(fphi_.invresolsq_range().max()));
 int
 map_manager::assign_map( std::string inp_str ) {
@@ -304,3 +313,123 @@ quaternion::rotate_coord( gsl_vector *x )
 	}
 }
 
+double
+residue_helper::calc_OS( void ) {
+	double zc=0.0;
+	if(bVecAs_){
+		rich::math_helper mah;
+		zc = mah.gsl_calc_orth( n2_, n1_, c2_, c1_, OS_ );
+	}
+	return zc;
+}
+
+double 
+residue_helper::analyze_stage1( int imod ,int icha ,int ires , CMMDBManager *mmdb, int nb, particles *residue_atoms ) {
+
+	rich::mmdb_helper mmhelp;
+	PPCAtom atoms_T,atoms_T2;
+
+	gsl_vector *vt	= gsl_vector_calloc(DIM);
+	int skip_res	= 0;
+	int abg		= 0;
+	int nResidues	= mmdb->GetNumberOfResidues(imod,icha);
+	int nAtoms,nAtoms2;
+
+	mmdb->GetAtomTable    ( imod ,icha ,ires , atoms_T, nAtoms );
+	residue_atoms->clear(); // warning dealloc
+
+	char r_inf[256];
+	atoms_T[0]->GetAtomID(r_inf);
+	std::string rtype = mmhelp.atom_resn(r_inf);
+	if( ires<nResidues-1 &&  rtype != "PRO" ) {
+		mmdb->GetAtomTable ( imod ,icha ,ires+1 , atoms_T2, nAtoms2 );
+		gsl_vector_set( n2_, XX, atoms_T2[0]->x );
+		gsl_vector_set( n2_, YY, atoms_T2[0]->y );
+		gsl_vector_set( n2_, ZZ, atoms_T2[0]->z );
+		skip_res++;
+	}
+
+	if(!bHasAMAT_) {
+		A_= gsl_matrix_calloc( nAtoms, DIM );
+	} else if ( bHasAMAT_&&A_->size1!=nAtoms ) {
+		gsl_matrix_free(A_);
+		A_= gsl_matrix_calloc( nAtoms, DIM );
+	}
+
+	for (int iat = 0; iat<nAtoms ; iat++ ) {
+		char a_inf[256];
+		atoms_T[iat]->GetAtomID(a_inf);
+		std::string atype = mmhelp.atom_type(a_inf);
+		std::string etype = mmhelp.atom_symb(a_inf);
+
+		gsl_vector_set(vt,XX,atoms_T[iat]->x);
+		gsl_vector_set(vt,YY,atoms_T[iat]->y);
+		gsl_vector_set(vt,ZZ,atoms_T[iat]->z);
+
+		if(iat==0) // SHOULD BE N
+			gsl_vector_memcpy(v0_,vt);
+
+		rich::particle res_atom;
+		res_atom.second = gsl_vector_alloc(DIM);
+		res_atom.first  = etype; 
+		gsl_vector_memcpy(res_atom.second,vt);
+		residue_atoms->push_back(res_atom);
+
+		if( atype=="C" && etype=="C" ) {	// CA
+			gsl_vector_memcpy(c1_,vt);
+			skip_res++;
+		}
+		if( atype=="O" && etype=="O" ) {	// CB NOT GLY
+			gsl_vector_memcpy(c2_,vt);
+			skip_res++;
+		}
+		if( atype=="N" && etype=="N" ) {
+			gsl_vector_memcpy(n1_,vt);
+			skip_res++;
+		}
+		if( ires>=nResidues-1 || rtype == "PRO" ) {
+			if( atype=="C" && etype=="C" ) {
+				gsl_vector_memcpy(n2_,vt);
+				skip_res++;
+			}
+		}
+		if( atype=="CA" && rtype != "PRO" ) {
+			gsl_vector_memcpy(ca_,vt);
+			abg++;
+			bHaveA_ = true;
+		}
+		if( atype=="CB" && rtype != "PRO" ) {
+			gsl_vector_memcpy(cb_,vt);
+			abg++;
+			bHaveB_ = true;
+		}
+		if( atype=="CG" && rtype != "PRO" ) {
+			gsl_vector_memcpy(cg_,vt);
+			abg++;
+			bHaveG_ = true;
+		}
+		gsl_matrix_set_row(A_,iat,vt);
+	}
+	if(skip_res!=4) {
+		bSkip_ = true;
+		std::cout << "INFO::SKIPPING RESIDUE "<< ires << " HAS " << skip_res << std::endl;
+	}
+//	CALCULATE LIMITS
+	gsl_matrix *V	= gsl_matrix_calloc( DIM, DIM	 );
+	gsl_vector *S	= gsl_vector_calloc(	DIM 	 );
+	gsl_vector *wrk	= gsl_vector_calloc(	DIM	 );
+	gsl_matrix *A	= gsl_matrix_calloc( nAtoms, DIM );
+	gsl_matrix_memcpy( A , A_ );
+
+	gsl_linalg_SV_decomp( A , V , S , wrk );
+	double cutoff 	= sqrt(gsl_vector_get(S,0))*0.5;
+	bVecAs_=true;
+
+	gsl_matrix_free(  A  );
+	gsl_matrix_free(  V  );
+	gsl_vector_free(  S  );
+	gsl_vector_free( wrk );
+	gsl_vector_free(  vt );
+
+	return cutoff;
+}
