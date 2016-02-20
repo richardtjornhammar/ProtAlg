@@ -3,6 +3,7 @@
 #include <string>
 #include <math.h>
 #include "iofun.h"
+#include "mdiag.h"
 
 using namespace rich;
 
@@ -313,12 +314,32 @@ quaternion::rotate_coord( gsl_vector *x )
 	}
 }
 
+int
+residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<int,double> > *theta, int nb ) {
+	rich::calc_map cmap;
+	cmap.set_nbins(nb);
+
+	gsl_matrix *P	= gsl_matrix_calloc(	nb, nb	 );
+	gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
+	if( cmap.proj(	P , CN , density ,
+		OS_ , v0_ , rc_ , zc_,
+		theta ) ) {
+		std::cout << "ERROR::FAILED" << std::endl;
+		exit(1);
+	}
+	gsl_matrix_free(P);
+	gsl_matrix_free(CN);
+
+	return 0;
+}
+
 double
 residue_helper::calc_OS( void ) {
 	double zc=0.0;
 	if(bVecAs_){
 		rich::math_helper mah;
 		zc = mah.gsl_calc_orth( n2_, n1_, c2_, c1_, OS_ );
+		zc_=zc;
 	}
 	return zc;
 }
@@ -372,7 +393,7 @@ residue_helper::analyze_stage1( int imod ,int icha ,int ires , CMMDBManager *mmd
 		rich::particle res_atom;
 		res_atom.second = gsl_vector_alloc(DIM);
 		res_atom.first  = etype; 
-		gsl_vector_memcpy(res_atom.second,vt);
+		gsl_vector_memcpy(res_atom.second, vt);
 		residue_atoms->push_back(res_atom);
 
 		if( atype=="C" && etype=="C" ) {	// CA
@@ -424,6 +445,7 @@ residue_helper::analyze_stage1( int imod ,int icha ,int ires , CMMDBManager *mmd
 	gsl_linalg_SV_decomp( A , V , S , wrk );
 	double cutoff 	= sqrt(gsl_vector_get(S,0))*0.5;
 	bVecAs_=true;
+	rc_=cutoff;
 
 	gsl_matrix_free(  A  );
 	gsl_matrix_free(  V  );

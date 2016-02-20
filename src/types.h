@@ -127,9 +127,11 @@ namespace rich {
 			};
 			double	analyze_stage1( int , int , int , CMMDBManager * , int , particles * );
 			double	calc_OS( void );
+			int	calc_proj( clipper::Xmap<float>, std::vector< std::pair<int,double> > * , int);
 			void copyA (  gsl_matrix *A ){ if(A->size1==A_->size1&&A->size2==A_->size2){ gsl_matrix_memcpy(A,A_); }; };
 			void copyv0( gsl_vector *v0 ){ if(v0->size==v0_->size){ gsl_vector_memcpy(v0,v0_); }; };
 			void copyOS( gsl_matrix *OS ){ if(OS->size1==OS_->size1&&OS->size2==OS_->size2){ gsl_matrix_memcpy(OS,OS_); }; };
+			bool skip(void) { return bSkip_; };
 			~residue_helper() {
 				gsl_vector_free( n2_ ); gsl_vector_free( n1_ );
 				gsl_vector_free( c2_ ); gsl_vector_free( c1_ );
@@ -147,6 +149,7 @@ namespace rich {
 			gsl_matrix *OS_,*O2_,*O3_;
 			gsl_matrix *A_;
 			bool bHasAMAT_;
+			double zc_,rc_;
 			std::vector<int> baplus_;
 			std::vector<int> gbplus_;
 			std::vector< particles > confs0_;

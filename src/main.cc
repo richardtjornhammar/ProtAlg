@@ -185,16 +185,6 @@ int main ( int argc, char ** argv ) {
 
 	rich::mmdb_helper mmhelp;
 
-//	AMINO VECTORS
-	gsl_vector *n1 = gsl_vector_calloc(DIM);
-	gsl_vector *n2 = gsl_vector_calloc(DIM);
-	gsl_vector *c1 = gsl_vector_calloc(DIM);
-	gsl_vector *c2 = gsl_vector_calloc(DIM);
-	gsl_vector *ca = gsl_vector_calloc(DIM);
-	gsl_vector *cb = gsl_vector_calloc(DIM);
-	gsl_vector *cg = gsl_vector_calloc(DIM);
-	gsl_vector *vt = gsl_vector_calloc(DIM);
-
 //	ORTHONORMAL SYSTEM STORAGE
 	gsl_vector *nh = gsl_vector_calloc(DIM);
 	gsl_vector *ph = gsl_vector_calloc(DIM);
@@ -220,34 +210,18 @@ int main ( int argc, char ** argv ) {
 				double zc = rh.calc_OS();			// CALCULATE ORTHONORMAL SYSTEM
 				gsl_matrix *OS	= gsl_matrix_calloc( DIM, DIM );
 				rh.copyOS(OS);
-
-				//gsl_matrix *O2	= gsl_matrix_calloc( DIM, DIM	 );
-				//gsl_matrix *O3	= gsl_matrix_calloc( DIM, DIM	 );
-				//rich::math_helper mah;
-				//double zc = mah.gsl_calc_orth( n2, n1, c2, c1, OS );
-				//double z2 = mah.gsl_calc_orth( cb, ca, n2, n1, O2 );
-				//double z3 = mah.gsl_calc_orth( cg, cb, n2, n1, O3 );
+				if(rh.skip())
+					continue;
+				rh.calc_proj( density, &theta , nb );
+				gsl_vector *v0  = gsl_vector_calloc(DIM);
+				rh.copyv0(v0);
 
 //			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
 //			CALULATE PROJECTION
-				rich::calc_map cmap;
-				cmap.set_nbins(nb);
-				gsl_vector *v0  = gsl_vector_calloc(DIM);
-				rh.copyv0(v0);
-				gsl_matrix *P	= gsl_matrix_calloc(	nb, nb	 );
-				gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
-				if( cmap.proj(	P , CN , density ,
-						OS , v0 , rc , zc,
-						&theta ) ) {
-					std::cout << "ERROR::FAILED" << std::endl;
-					fatal();
-				}
-
 				if( ires == 40 && icha==0 ) {	// TESTCASE
 				//if( 1 ) {
 					if( verbose ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
 						rich::mat_io mIO;
-						mIO.write_gsl2datn( P, CN, "testproj.dat"  );
 						mIO.write_vdbl2dat( theta, "testTheta.dat" );
 					}
 					std::sort( theta.begin(), theta.end(), compare_pid );
@@ -316,21 +290,6 @@ int main ( int argc, char ** argv ) {
 						tIO.output_vector(rx);
 					}
 				}
-
-			//	if(verbose) {
-			//		rich::tensorIO tIO;
-			//		tIO.output_matrix(OS); tIO.output_matrix(V);
-			//		tIO.output_vector(nh);
-			//	}
-/*
-				gsl_matrix_free( P );
-				gsl_matrix_free( CN );
-				gsl_matrix_free( A );
-				gsl_matrix_free( V );
-				gsl_matrix_free( OS );
-				gsl_vector_free( S );
-				gsl_vector_free( wrk );
-*/
 			}
 		}
 	}
