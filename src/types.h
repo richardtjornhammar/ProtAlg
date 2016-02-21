@@ -31,6 +31,12 @@ namespace rich {
 	typedef std::pair<std::string, gsl_vector * >	particle;
 	typedef std::vector< particle > 		particles;
 
+	class particle_helper {
+		public:		particles particles_memcpy( particles );
+		private:
+			;
+	};
+
 	class phys_constants {
 		public:
 			phys_constants() { // SI UNITS
@@ -100,6 +106,7 @@ namespace rich {
 			int	rotate_coord	( gsl_vector *x );
 			int	rotate_particles( particles );
 			int	rotate_particles( particles , gsl_vector * );
+			int	rotate_particles( particles , gsl_vector * , std::vector<bool> );
 			void	print();
 			bool	is_complete() { return bSet_; };
 			~quaternion() {
@@ -120,25 +127,31 @@ namespace rich {
 				ca_=gsl_vector_calloc(DIM);	cb_=gsl_vector_calloc(DIM);
 				cg_=gsl_vector_calloc(DIM);	v0_=gsl_vector_calloc(DIM);
 				OS_=gsl_matrix_calloc(DIM,DIM);	O2_=gsl_matrix_calloc(DIM,DIM);
-				O3_=gsl_matrix_calloc(DIM,DIM);
+				O1_=gsl_matrix_calloc(DIM,DIM);
 				isPRO_	= false; bOS_	= false; bHasAMAT_	= false;
 				bHaveA_	= false; bHaveB_= false; bHaveG_	= false; 
-				bVecAs_	= false; bSkip_	= false;
+				bVecAs_	= false; bSkip_	= false; nResAtoms_ 	= 0;
 			};
 			double	analyze_stage1( int , int , int , CMMDBManager * , int , particles * );
 			double	calc_OS( void );
-			int	calc_proj( clipper::Xmap<float>, std::vector< std::pair<int,double> > * , int);
+			double	calc_O1( particles  ); // particles only r no rw
+			double	calc_O2( particles  ); // particles only r no rw
+			std::vector<double> prune_angles(std::vector< std::pair<int,double> > *, double, int);
+			int	calc_proj( clipper::Xmap<float>, std::vector< std::pair<int,double> > * , int, int );
 			void copyA (  gsl_matrix *A ){ if(A->size1==A_->size1&&A->size2==A_->size2){ gsl_matrix_memcpy(A,A_); }; };
 			void copyv0( gsl_vector *v0 ){ if(v0->size==v0_->size){ gsl_vector_memcpy(v0,v0_); }; };
 			void copyOS( gsl_matrix *OS ){ if(OS->size1==OS_->size1&&OS->size2==OS_->size2){ gsl_matrix_memcpy(OS,OS_); }; };
+			void copyO1( gsl_matrix *O1 ){ if(O1->size1==O1_->size1&&O1->size2==O1_->size2){ gsl_matrix_memcpy(O1,O1_); }; };
 			bool skip(void) { return bSkip_; };
+			bool do2nd(void) { return bHaveA_&&bHaveB_; }
+			std::vector<bool> get_mask( int );
 			~residue_helper() {
 				gsl_vector_free( n2_ ); gsl_vector_free( n1_ );
 				gsl_vector_free( c2_ ); gsl_vector_free( c1_ );
 				gsl_vector_free( ca_ ); gsl_vector_free( cb_ );
 				gsl_vector_free( cg_ ); gsl_vector_free( v0_ );
 				gsl_matrix_free( OS_ ); gsl_matrix_free( O2_ );
-				gsl_matrix_free( O3_ );
+				gsl_matrix_free( O1_ );
 			};
 		private:
 			bool bSkip_;
@@ -146,13 +159,15 @@ namespace rich {
 			bool isPRO_, bHaveA_, bHaveB_, bHaveG_, bOS_;
 			gsl_vector *n2_,*n1_,*c2_,*c1_,*ca_,*cb_,*cg_,*v0_;
 			bool bVecAs_;
-			gsl_matrix *OS_,*O2_,*O3_;
+			gsl_matrix *OS_,*O1_,*O2_;
 			gsl_matrix *A_;
 			bool bHasAMAT_;
 			double zc_,rc_;
 			std::vector<int> baplus_;
 			std::vector<int> gbplus_;
 			std::vector< particles > confs0_;
+			int N_, CA_, CB_, CG_, C_, O_;
+			int nResAtoms_;
 	};
 }
 

@@ -274,6 +274,26 @@ quaternion::rotate_particles( particles ps , gsl_vector *v0 ) {
 }
 
 int
+quaternion::rotate_particles( particles ps , gsl_vector *v0 ,std::vector<bool> mask) {
+	if( is_complete() ){
+		gsl_vector *tmp = gsl_vector_calloc(DIM);
+		for(int i=0;i<ps.size();i++){
+			if(!mask[i]){
+				gsl_vector_sub( ps[i].second, v0 );
+				rotate_coord  ( ps[i].second	 );
+				gsl_vector_add( ps[i].second, v0 );
+			}
+		}
+		gsl_vector_free(tmp);
+	}
+	else {
+		return 1;
+	}
+
+	return 0;
+}
+
+int
 quaternion::rotate_coord( gsl_vector *x ) 
 {
 	double xX,yY,zZ;
@@ -314,23 +334,100 @@ quaternion::rotate_coord( gsl_vector *x )
 	}
 }
 
+std::vector<bool> 
+residue_helper::get_mask( int sw ) {
+	std::vector<bool> mask;
+	switch(sw) {
+		case 2:
+			for(int i=0;i<nResAtoms_;i++) {
+				mask.push_back(i==CA_||i==CB_||i<=CG_||i==N_||i==C_||i==O_);
+			}
+			break;
+		default:
+			for(int i=0;i<nResAtoms_;i++) {
+				mask.push_back(i==CA_||i==CB_||i==N_||i==C_||i==O_);
+			}
+			break;
+	}
+	return mask;
+
+}
+
 int
-residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<int,double> > *theta, int nb ) {
+residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<int,double> > *theta, int nb , int which ) {
 	rich::calc_map cmap;
 	cmap.set_nbins(nb);
 
 	gsl_matrix *P	= gsl_matrix_calloc(	nb, nb	 );
 	gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
-	if( cmap.proj(	P , CN , density ,
-		OS_ , v0_ , rc_ , zc_,
-		theta ) ) {
-		std::cout << "ERROR::FAILED" << std::endl;
-		exit(1);
+	switch( which ) {
+		case 2:
+			if( cmap.proj(	P , CN , density ,
+				O2_ , v0_ , rc_ , zc_,
+				theta ) ) {
+				std::cout << "ERROR::FAILED" << std::endl;
+				exit(1);
+			}
+			break;
+		case 1:
+			if( cmap.proj(	P , CN , density ,
+				O1_ , v0_ , rc_ , zc_,
+				theta ) ) {
+				std::cout << "ERROR::FAILED" << std::endl;
+				exit(1);
+			}
+			break;
+		default:
+			if( cmap.proj(	P , CN , density ,
+				OS_ , v0_ , rc_ , zc_,
+				theta ) ) {
+				std::cout << "ERROR::FAILED" << std::endl;
+				exit(1);
+			}
+			break;
 	}
 	gsl_matrix_free(P);
 	gsl_matrix_free(CN);
 
 	return 0;
+}
+
+particles 
+particle_helper::particles_memcpy( particles rfull ) {
+	particles rblank;
+	for(int i=0;i<rfull.size();i++){
+		gsl_vector *r = gsl_vector_calloc(DIM);
+		gsl_vector_memcpy( r, rfull[i].second );
+		particle ptmp;
+		ptmp.first  = rfull[i].first;
+		ptmp.second = r;
+		rblank.push_back(ptmp);
+	}
+	return rblank;
+}
+
+bool compare_pid ( std::pair< int , double > pid1 ,
+		   std::pair< int , double > pid2 ) {
+	return( pid1.second < pid2.second ) ; 
+};
+
+std::vector<double> 
+residue_helper::prune_angles(std::vector< std::pair<int,double> > * theta, double TOL, int N){ 
+	int verbose=0;
+	std::sort( (*(theta)).begin(), (*(theta)).end(), compare_pid );
+	double val = 100.0, alimit = TOL; //6.7E-2//7.0E-2
+	std::vector<double> v_ang;
+	int Ith = (*(theta)).size();
+	do {
+		val		= (*(theta))[Ith-1].second		/ sqrt(float(N));
+		double ang	= (*(theta))[Ith-1].first  * 360.0	/ (float(N));
+		if( verbose )
+			std::cout << "INFO::MAX > " << Ith << " " << ang << " " << val << std::endl;
+		if( val > alimit )
+			v_ang.push_back(ang);
+		Ith--;
+	} while( val > alimit && Ith>=0 ) ;
+	return v_ang;
 }
 
 double
@@ -339,10 +436,34 @@ residue_helper::calc_OS( void ) {
 	if(bVecAs_){
 		rich::math_helper mah;
 		zc = mah.gsl_calc_orth( n2_, n1_, c2_, c1_, OS_ );
-		zc_=zc;
+		zc_=zc;	// DO OVERWRITE ZC
 	}
 	return zc;
 }
+
+double
+residue_helper::calc_O1( particles resatms ) {
+	double zc=0.0;
+	if(bVecAs_&&bHaveA_&&bHaveB_){
+		rich::math_helper mah;
+		gsl_vector_memcpy(cb_,resatms[CB_].second);
+		gsl_vector_memcpy(ca_,resatms[CA_].second);
+		gsl_vector_memcpy(v0_,ca_);
+		zc = mah.gsl_calc_orth(  cb_, ca_, n2_, n1_, O1_ ); // DO NOT OVERWRITE OLD ZC
+	}
+	return zc;
+}
+
+double
+residue_helper::calc_O2( particles resatms ) {
+	double zc=0.0;
+	if(bVecAs_&&bHaveB_&&bHaveG_){
+		rich::math_helper mah;
+		zc = mah.gsl_calc_orth(  cg_, cb_, n2_, n1_, O2_ );
+	}
+	return zc;
+}
+
 
 double 
 residue_helper::analyze_stage1( int imod ,int icha ,int ires , CMMDBManager *mmdb, int nb, particles *residue_atoms ) {
@@ -357,7 +478,7 @@ residue_helper::analyze_stage1( int imod ,int icha ,int ires , CMMDBManager *mmd
 	int nAtoms,nAtoms2;
 
 	mmdb->GetAtomTable    ( imod ,icha ,ires , atoms_T, nAtoms );
-	residue_atoms->clear(); // warning dealloc
+	residue_atoms->clear(); // warning dealloc particles OK but particle is NOT OK
 
 	char r_inf[256];
 	atoms_T[0]->GetAtomID(r_inf);
@@ -399,14 +520,17 @@ residue_helper::analyze_stage1( int imod ,int icha ,int ires , CMMDBManager *mmd
 		if( atype=="C" && etype=="C" ) {	// CA
 			gsl_vector_memcpy(c1_,vt);
 			skip_res++;
+			C_=iat;
 		}
 		if( atype=="O" && etype=="O" ) {	// CB NOT GLY
 			gsl_vector_memcpy(c2_,vt);
 			skip_res++;
+			O_=iat;
 		}
 		if( atype=="N" && etype=="N" ) {
 			gsl_vector_memcpy(n1_,vt);
 			skip_res++;
+			N_=iat;
 		}
 		if( ires>=nResidues-1 || rtype == "PRO" ) {
 			if( atype=="C" && etype=="C" ) {
@@ -418,16 +542,19 @@ residue_helper::analyze_stage1( int imod ,int icha ,int ires , CMMDBManager *mmd
 			gsl_vector_memcpy(ca_,vt);
 			abg++;
 			bHaveA_ = true;
+			CA_=iat;
 		}
 		if( atype=="CB" && rtype != "PRO" ) {
 			gsl_vector_memcpy(cb_,vt);
 			abg++;
 			bHaveB_ = true;
+			CB_=iat;
 		}
 		if( atype=="CG" && rtype != "PRO" ) {
 			gsl_vector_memcpy(cg_,vt);
 			abg++;
 			bHaveG_ = true;
+			CG_=iat;
 		}
 		gsl_matrix_set_row(A_,iat,vt);
 	}
@@ -441,7 +568,7 @@ residue_helper::analyze_stage1( int imod ,int icha ,int ires , CMMDBManager *mmd
 	gsl_vector *wrk	= gsl_vector_calloc(	DIM	 );
 	gsl_matrix *A	= gsl_matrix_calloc( nAtoms, DIM );
 	gsl_matrix_memcpy( A , A_ );
-
+	nResAtoms_=nAtoms;
 	gsl_linalg_SV_decomp( A , V , S , wrk );
 	double cutoff 	= sqrt(gsl_vector_get(S,0))*0.5;
 	bVecAs_=true;

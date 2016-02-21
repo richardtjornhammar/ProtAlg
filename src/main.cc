@@ -44,11 +44,6 @@ fatal(void) {
 	exit(1);
 }
 
-bool compare_pid ( std::pair< int , double > pid1 ,
-		   std::pair< int , double > pid2 ) {
-	return( pid1.second < pid2.second ) ; 
-};
-
 int main ( int argc, char ** argv ) {
 	int verbose = 0;
 
@@ -190,12 +185,13 @@ int main ( int argc, char ** argv ) {
 	gsl_vector *ph = gsl_vector_calloc(DIM);
 	gsl_vector *qh = gsl_vector_calloc(DIM);
 
-	std::vector< std::pair<int,double> > theta;
+	std::vector< std::pair<int,double> > theta, chi;
 	int Ntheta=NBINS_IO;
 	for ( int i=0 ; i<Ntheta ; i++ ) {
 		std::pair< int, double > pid;
 		pid.first=i; pid.second=0.0;
 		theta.push_back(pid);
+		chi.push_back(pid);
 	}
 	int nb = NBINS_IO;
 	for ( imod=1 ; imod<=nModels ; imod++ ) {
@@ -208,62 +204,96 @@ int main ( int argc, char ** argv ) {
 				rich::residue_helper rh;
 				double rc = rh.analyze_stage1( imod, icha, ires, &mmdb, nb , &residue_atoms );
 				double zc = rh.calc_OS();			// CALCULATE ORTHONORMAL SYSTEM
-				gsl_matrix *OS	= gsl_matrix_calloc( DIM, DIM );
-				rh.copyOS(OS);
 				if(rh.skip())
 					continue;
-				rh.calc_proj( density, &theta , nb );
+				rh.calc_proj( density, &theta , nb , 0 );
 				gsl_vector *v0  = gsl_vector_calloc(DIM);
 				rh.copyv0(v0);
 
 //			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
 //			CALULATE PROJECTION
-				if( ires == 40 && icha==0 ) {	// TESTCASE
-				//if( 1 ) {
+				//if( ires == 40 && icha==0 ) {	// TESTCASE
+				if( 1 ) {
 					if( verbose ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
 						rich::mat_io mIO;
 						mIO.write_vdbl2dat( theta, "testTheta.dat" );
 					}
-					std::sort( theta.begin(), theta.end(), compare_pid );
-					double val = 100.0, alimit = 7E-2;
-					std::vector<double> v_ang;
-					int Ith = theta.size();
-					do {
-						val		= theta[Ith-1].second		/ sqrt(float(NBINS_IO));
-						double ang	= theta[Ith-1].first  * 360.0	/ (float(NBINS_IO));
-						if( verbose )
-							std::cout << "INFO::MAX > " << Ith << " " << ang << " " << val << std::endl;
-						if( val > alimit )
-							v_ang.push_back(ang);
-						Ith--;
-					} while( val > alimit && Ith>=0 ) ;
 
-					rich::fileIO	fIO;
-					gsl_matrix_get_row( nh, OS, 0 );
+					std::vector<double> v_ang = rh.prune_angles( &theta , 6E-2, nb ); //24 8
 
 					if( v_ang.size() < 1)
 						continue;
 
-					for(int i_ang=0; i_ang < v_ang.size() ; i_ang++) {
-						model = newCModel(	);
-						model->Copy( model_T[0] );
+					rich::fileIO	fIO;
+					gsl_matrix *OS	= gsl_matrix_calloc( DIM, DIM );
+					rh.copyOS(OS);
+					gsl_matrix_get_row( nh, OS, 0 );
+					rich::particle_helper parth;
 
+					for(int i_ang=0; i_ang < v_ang.size() ; i_ang++) {
+						rich::particles rotres_atoms0;
 						rich::quaternion q;
 						double fi = (i_ang==0)?( v_ang[i_ang] ):(v_ang[i_ang]-v_ang[i_ang-1]);
 						q.assign_quaterion( nh , v_ang[i_ang] * M_PI/180.0 );
-						q.rotate_particles( residue_atoms , v0 );
+						rotres_atoms0 = parth.particles_memcpy( residue_atoms );
+						//q.rotate_particles( residue_atoms , v0 );
+						q.rotate_particles( rotres_atoms0 , v0 );
 
-						if( mmhelp.check_clash( NM, icha, ires, &mmdb_N, residue_atoms, 1.0 ) > 1 ) {
+						if( rh.do2nd() && 1 ) {
+					//	UGLY BUT REDO
+					//	COPY ROTATED RESIDUE ATOMS AND RECALC
+							gsl_vector *v00  = gsl_vector_calloc(DIM);
+							
+							rich::particles rotres_atoms1;
+							
+							rotres_atoms1 = parth.particles_memcpy( rotres_atoms0 ); // residue_atoms
+							double zc_rr1 = rh.calc_O1( rotres_atoms1 );
+							rh.copyv0(v00);
+							rh.calc_proj( density, &chi , nb , 1 );
+							std::vector<double> v_chi = rh.prune_angles( &chi ,5.0E-2, nb );
+							gsl_matrix *O1	= gsl_matrix_calloc( DIM, DIM );
+							rh.copyO1(O1);
+							gsl_matrix_get_row( ph, O1, 0 );
+							for(int i_chi=0; i_chi < v_chi.size() ; i_chi++) {
+								rich::quaternion qq;
+								double phi = (i_chi==0)?( v_chi[i_chi] ):(v_chi[i_chi]-v_chi[i_chi-1]);
+								qq.assign_quaterion( ph , v_chi[i_chi] * M_PI/180.0 );
+								std::vector<bool> mask = rh.get_mask(0);
+								if(mask.size()!=rotres_atoms1.size() )
+									if(1)
+										std::cout << "INFO::WE HAVE A BAD MASK" << std::endl;		
+								qq.rotate_particles( rotres_atoms1 , v00 , mask );
+								if( mmhelp.check_clash( 1 , icha, ires, &mmdb_N, rotres_atoms1, 1.0 ) > 1 ) {
+									if(verbose)
+										std::cout << "INFO::WE HAVE CLASH" << std::endl;
+								} else {
+									model = newCModel(	);
+									model->Copy( model_T[0] );
+									NM++;
+									mmdb_N.AddModel( model  );
+									if( mmhelp.update_residue( 1 ,icha ,ires, &mmdb_N, rotres_atoms1 ) ) {
+										std::cout << "::ERROR::" << std::endl;
+										fatal();
+									}
+								}
+							}
+
+						}
+
+						if( mmhelp.check_clash( NM, icha, ires, &mmdb_N, rotres_atoms0, 1.0 ) > 1 ) {
 							if(verbose)
 								std::cout << "INFO::WE HAVE CLASH" << std::endl;
 						} else {
+							model = newCModel(	);
+							model->Copy( model_T[0] );
 							NM++;
 							mmdb_N.AddModel( model  ); 
-							if( mmhelp.update_residue( NM ,icha ,ires, &mmdb_N, residue_atoms ) ) {
+							if( mmhelp.update_residue( NM ,icha ,ires, &mmdb_N, rotres_atoms0 ) ) {
 								std::cout << "::ERROR::" << std::endl;
 								fatal();
 							}
 						}
+						
 						if( verbose ) {
 							fIO.output_pdb( "rotres" + std::to_string(i_ang) + ".pdb" , residue_atoms );
 						}

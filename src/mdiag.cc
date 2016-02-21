@@ -96,5 +96,10 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 		(*(theta))[i].second/=fi_cnt[i];
 	}
 
+	gsl_vector_free( rvec );
+	gsl_vector_free(  xh  );
+	gsl_vector_free(  yh  );
+	gsl_vector_free(  zh  );
+
 	return 0;
 }
