@@ -393,6 +393,47 @@ residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<
 	return 0;
 }
 
+int
+residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<int,double> > *theta, int nb , int which, int ires ) {
+	rich::calc_map cmap;
+	cmap.set_nbins(nb);
+
+	gsl_matrix *P	= gsl_matrix_calloc(	nb, nb	 );
+	gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
+	switch( which ) {
+		case 2:
+			if( cmap.proj(	P , CN , density ,
+				O2_ , v0_ , rc_ , zc_,
+				theta ) ) {
+				std::cout << "ERROR::FAILED" << std::endl;
+				exit(1);
+			}
+			break;
+		case 1:
+			if( cmap.proj(	P , CN , density ,
+				O1_ , v0_ , rc_ , zc_,
+				theta ) ) {
+				std::cout << "ERROR::FAILED" << std::endl;
+				exit(1);
+			}
+			break;
+		default:
+			if( cmap.proj(	P , CN , density ,
+				OS_ , v0_ , rc_ , zc_,
+				theta ) ) {
+				std::cout << "ERROR::FAILED" << std::endl;
+				exit(1);
+			}
+			break;
+	}
+	rich::mat_io	mio;
+	mio.write_gsl2datn(P, CN, "resP"+ std::to_string(ires) +".dat" );
+	gsl_matrix_free(P);
+	gsl_matrix_free(CN);
+
+	return 0;
+}
+
 particles 
 particle_helper::particles_memcpy( particles rfull ) {
 	particles rblank;

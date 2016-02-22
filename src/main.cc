@@ -195,6 +195,8 @@ int main ( int argc, char ** argv ) {
 		chi.push_back(pid);
 	}
 	int nb = NBINS_IO;
+	double TOL=3E-2;
+
 	for ( imod=1 ; imod<=nModels ; imod++ ) {
 		nChains = mmdb.GetNumberOfChains( imod ); 
 		for ( icha = 0 ; icha < nChains ; icha++ ) { 
@@ -207,20 +209,24 @@ int main ( int argc, char ** argv ) {
 				double zc = rh.calc_OS();			// CALCULATE ORTHONORMAL SYSTEM
 				if(rh.skip())
 					continue;
-				rh.calc_proj( density, &theta , nb , 0 );
+				
+				if( (ires == 40 || ires==88) && icha==0)
+					rh.calc_proj( density, &theta , nb , 0 , ires );
+				else
+					rh.calc_proj( density, &theta , nb , 0 );
 				gsl_vector *v0  = gsl_vector_calloc(DIM);
 				rh.copyv0(v0);
 
 //			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
 //			CALULATE PROJECTION
-				//if( ires == 40 && icha==0 ) {	// TESTCASE
-				if( 1 ) {
+				if( (ires == 40 || ires==88) && icha==0 ) {	// TESTCASE
+				//if( 1 ) {
 					if( verbose ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
 						rich::mat_io mIO;
 						mIO.write_vdbl2dat( theta, "testTheta.dat" );
 					}
 
-					std::vector<double> v_ang = rh.prune_angles( &theta , 6E-2, nb ); //24 8
+					std::vector<double> v_ang = rh.prune_angles( &theta , TOL, nb ); //24 8
 
 					if( v_ang.size() < 1)
 						continue;
@@ -232,17 +238,19 @@ int main ( int argc, char ** argv ) {
 					rich::particle_helper parth;
 
 					for(int i_ang=0; i_ang < v_ang.size() ; i_ang++) {
+						// if(i_ang>1)
+						//	continue;
 						rich::particles rotres_atoms0;
 						rich::quaternion q;
 						double fi = (i_ang==0)?( v_ang[i_ang] ):(v_ang[i_ang]-v_ang[i_ang-1]);
 						q.assign_quaterion( nh , v_ang[i_ang] * M_PI/180.0 );
 						rotres_atoms0 = parth.particles_memcpy( residue_atoms );
-						//q.rotate_particles( residue_atoms , v0 );
+						// q.rotate_particles( residue_atoms , v0 );
 						q.rotate_particles( rotres_atoms0 , v0 );
 
 						if( rh.do2nd() && 1 ) {
-					//	UGLY BUT REDO
-					//	COPY ROTATED RESIDUE ATOMS AND RECALC
+						// UGLY BUT REDO
+						// COPY ROTATED RESIDUE ATOMS AND RECALC
 							gsl_vector *v00  = gsl_vector_calloc(DIM);
 							
 							rich::particles rotres_atoms1;
@@ -251,7 +259,7 @@ int main ( int argc, char ** argv ) {
 							double zc_rr1 = rh.calc_O1( rotres_atoms1 );
 							rh.copyv0(v00);
 							rh.calc_proj( density, &chi , nb , 1 );
-							std::vector<double> v_chi = rh.prune_angles( &chi ,5.0E-2, nb );
+							std::vector<double> v_chi = rh.prune_angles( &chi , TOL, nb );
 							gsl_matrix *O1	= gsl_matrix_calloc( DIM, DIM );
 							rh.copyO1(O1);
 							gsl_matrix_get_row( ph, O1, 0 );

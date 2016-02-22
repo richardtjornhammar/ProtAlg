@@ -138,13 +138,17 @@ namespace rich {
 			double	calc_O2( particles  ); // particles only r no rw
 			std::vector<double> prune_angles(std::vector< std::pair<int,double> > *, double, int);
 			int	calc_proj( clipper::Xmap<float>, std::vector< std::pair<int,double> > * , int, int );
+			int	calc_proj( clipper::Xmap<float>, std::vector< std::pair<int,double> > * , int, int, int );
 			void copyA (  gsl_matrix *A ){ if(A->size1==A_->size1&&A->size2==A_->size2){ gsl_matrix_memcpy(A,A_); }; };
 			void copyv0( gsl_vector *v0 ){ if(v0->size==v0_->size){ gsl_vector_memcpy(v0,v0_); }; };
 			void copyOS( gsl_matrix *OS ){ if(OS->size1==OS_->size1&&OS->size2==OS_->size2){ gsl_matrix_memcpy(OS,OS_); }; };
 			void copyO1( gsl_matrix *O1 ){ if(O1->size1==O1_->size1&&O1->size2==O1_->size2){ gsl_matrix_memcpy(O1,O1_); }; };
 			bool skip(void) { return bSkip_; };
 			bool do2nd(void) { return bHaveA_&&bHaveB_; }
+			bool do3nd(void) { return bHaveB_&&bHaveG_; }
 			std::vector<bool> get_mask( int );
+			void scale_c(double s){zc_*=s;rc_*=s;};
+			void scale_z(double s){zc_*=s;};
 			~residue_helper() {
 				gsl_vector_free( n2_ ); gsl_vector_free( n1_ );
 				gsl_vector_free( c2_ ); gsl_vector_free( c1_ );

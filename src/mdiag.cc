@@ -63,7 +63,7 @@ calc_map::proj(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 		gsl_blas_ddot ( rvec, yh , &y );
 		gsl_blas_ddot ( rvec, zh , &z );
 		double r2	= (x*x+y*y); // PROJECTED
-		if( r2 < RC*RC && z<ZC && z>0.0 ) {
+		if( r2 < RC*RC && z*z<ZC*ZC ) { // && z>0 THIS THING
 			double	res   	 = atan2(y,x)*180.0/M_PI+180.0;
 			int	ires 	 = floor(res);
 			if(verbose) {
