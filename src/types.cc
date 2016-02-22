@@ -2,6 +2,7 @@
 #include <vector>
 #include <string>
 #include <math.h>
+#include <algorithm>
 #include "iofun.h"
 #include "mdiag.h"
 

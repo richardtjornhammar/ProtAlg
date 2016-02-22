@@ -33,6 +33,7 @@
 // rm src/*~
 // COMPILE:: g++ -I/usr/local/include/clipper -std=c++11 src/* -L/usr/local/lib -lmmdb -lclipper-core -lclipper-contrib -lgsl -lblas -o rich_dyn
 // COMPILE:: export LD_LIBRARY_PATH=/usr/local/lib 
+// COMPILE:: export LD_LIBRARY_PATH=/home/richard/autobuild/Linux-Carmack-pre-release-gtk2-noguile/lib
 // COMPILE:: g++ -std=c++11 src/* -lmmdb -lclipper-core -lclipper-ccp4 -lclipper-contrib -lgsl -lblas -o rich_dyn
 // COMPILE:: export LD_LIBRARY_PATH=/home/richard/autobuild/Linux-Carmack-pre-release-gtk2-noguile/lib && g++ -std=c++11 src/* -lmmdb -lclipper-core -lclipper-ccp4 -lclipper-contrib -lgsl -lblas -o rich_dyn
 
