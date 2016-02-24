@@ -58,7 +58,7 @@ int main ( int argc, char ** argv ) {
 	vipss.first=1;	vipss.second.first = "-mfile"; 
 			vipss.second.second = "m_default.pdb";
 	opts_n_defaults.push_back(vipss);
-	vipss.first=0;	vipss.second.first = "-dfile"; 
+	vipss.first=1;	vipss.second.first = "-dfile"; 
 			vipss.second.second = "d_default.mtz";
 	opts_n_defaults.push_back(vipss);
 	vipss.first=0;	vipss.second.first = "-nbins";
@@ -122,66 +122,21 @@ int main ( int argc, char ** argv ) {
 	int		nModels;
 	int 		nChains,nResidues,nAtoms,nAtoms2;
 	int		imod,icha,ires,iat;
+	rich::mmdb_helper mmhelp;
 
-	mmdb.GetModelTable( model_T, nModels );
-	model = newCModel(	);
-	model->Copy( model_T[0] );
-	mmdb_N.AddModel(  model );
+	mmdb.GetModelTable	( model_T, nModels );
+	model = newCModel	(	);
+	model -> Copy		( model_T[0] );
+	mmdb_N.AddModel		(  model );
 	int NM=1;
 
-//	CRYSTAL CELL STUFF
-	int RC;
-	if (mmdb.isSpaceGroup() && !(mmdb_N.isSpaceGroup()) )  {
-		// space group name is for demonstration only
-		RC = mmdb_N.SetSpaceGroup ( mmdb.GetSpaceGroup () );
-		if (RC!=SYMOP_Ok)   {
-			switch (RC)  {
-				case SYMOP_NoLibFile :
-					printf ( " **** error: can't find symop.lib\n" );
-					break;
-				case SYMOP_UnknownSpaceGroup :
-					printf ( " **** error: attempt to set up unknown space group\n" );
-					break;
-				case SYMOP_NoSymOps :
-					printf ( " **** error: no symmetry operations found\n" );
-					break;
-				default :
-					printf ( " **** error: unknown return code from "
-					"CMMDBManager::SetSpaceGroup()\n" );
-				}
-			exit(2);
-		}
-		std::cout << "INFO::ASSIGNED SYM. INFORMATION"<< std::endl;
-	}
-	if (mmdb.isCrystInfo())  {
-		// numerical values are for demonstration only
-		double cell[8];
-		int OC[0];
-    		mmdb.GetCell ( cell[0], cell[1], cell[2], cell[3] , cell[4] , cell[5] , cell[6] , OC[0] );
-		mmdb_N.SetCell ( cell[0], cell[1], cell[2], cell[3] , cell[4] , cell[5] , OC[0] );
-		std::cout << "INFO::ASSIGNED CELL INFORMATION"<< std::endl;
-	}
-	RC = mmdb_N.CrystReady();
-	if (RC>0)  {
-		if (RC & CRRDY_NotPrecise)
-			std::cout << "WARNING:: 1 \n" ;
-		if (RC & CRRDY_isTranslation)
-			std::cout << "WARNING:: 2 \n" ;
-		if (RC & CRRDY_NoOrthCode)
-			std::cout << "WARNING:: 3 \n" ;
-	}
-	RC = mmdb_N.GenerateSymMates ( NULL );
-	if (RC>0)  {
-		std::cout << "WARNING:: " << RC <<" \n" ;
-	}
-//	MOD MANAGER HAS CELL AND SYM
+	// XTAL HEADER
+	mmhelp.copy_xtal( &mmdb , &mmdb_N );
 
 	std::cout << "INFO:: HAVE " << nModels << " MODELS" << std::endl;
 	int nErr=0;
 
-	rich::mmdb_helper mmhelp;
-
-//	ORTHONORMAL SYSTEM STORAGE
+	// ORTHONORMAL SYSTEM VECTORS
 	gsl_vector *nh = gsl_vector_calloc(DIM);
 	gsl_vector *ph = gsl_vector_calloc(DIM);
 	gsl_vector *qh = gsl_vector_calloc(DIM);
@@ -194,8 +149,8 @@ int main ( int argc, char ** argv ) {
 		theta.push_back(pid);
 		chi.push_back(pid);
 	}
-	int nb = NBINS_IO;
-	double TOL=3E-2;
+	int nb		= NBINS_IO;
+	double TOL	= 3E-2;
 
 	for ( imod=1 ; imod<=nModels ; imod++ ) {
 		nChains = mmdb.GetNumberOfChains( imod ); 
@@ -211,9 +166,10 @@ int main ( int argc, char ** argv ) {
 					continue;
 				
 				if( (ires == 40 || ires==88) && icha==0)
-					rh.calc_proj( density, &theta , nb , 0 , ires );
+					rh.calc_proj( density, mmap.get_gsa(), &theta , nb , 0 , ires );
 				else
-					rh.calc_proj( density, &theta , nb , 0 );
+					rh.calc_proj( density, mmap.get_gsa(), &theta , nb , 0 );
+
 				gsl_vector *v0  = gsl_vector_calloc(DIM);
 				rh.copyv0(v0);
 
@@ -242,7 +198,7 @@ int main ( int argc, char ** argv ) {
 						//	continue;
 						rich::particles rotres_atoms0;
 						rich::quaternion q;
-						double fi = (i_ang==0)?( v_ang[i_ang] ):(v_ang[i_ang]-v_ang[i_ang-1]);
+						//double fi = (i_ang==0)?( v_ang[i_ang] ):(v_ang[i_ang]-v_ang[i_ang-1]);
 						q.assign_quaterion( nh , v_ang[i_ang] * M_PI/180.0 );
 						rotres_atoms0 = parth.particles_memcpy( residue_atoms );
 						// q.rotate_particles( residue_atoms , v0 );
@@ -258,7 +214,7 @@ int main ( int argc, char ** argv ) {
 							rotres_atoms1 = parth.particles_memcpy( rotres_atoms0 ); // residue_atoms
 							double zc_rr1 = rh.calc_O1( rotres_atoms1 );
 							rh.copyv0(v00);
-							rh.calc_proj( density, &chi , nb , 1 );
+							rh.calc_proj( density, mmap.get_gsa(), &chi , nb , 1 );
 							std::vector<double> v_chi = rh.prune_angles( &chi , TOL, nb );
 							gsl_matrix *O1	= gsl_matrix_calloc( DIM, DIM );
 							rh.copyO1(O1);

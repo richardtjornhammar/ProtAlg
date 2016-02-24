@@ -103,6 +103,57 @@ mmdb_helper::check_clash( int imod, int icha, int iRes, CMMDBManager *MMDB, part
 
 
 int
+mmdb_helper::copy_xtal	( CMMDBManager* mmdb, CMMDBManager* mmdb_N ) {
+
+	int RC;
+
+	if (mmdb->isSpaceGroup() && !(mmdb_N->isSpaceGroup()) )  {
+		// space group name is for demonstration only
+		RC = mmdb_N->SetSpaceGroup ( mmdb->GetSpaceGroup () );
+		if (RC!=SYMOP_Ok)   {
+			switch (RC)  {
+				case SYMOP_NoLibFile :
+					printf ( " **** error: can't find symop.lib\n" );
+					break;
+				case SYMOP_UnknownSpaceGroup :
+					printf ( " **** error: attempt to set up unknown space group\n" );
+					break;
+				case SYMOP_NoSymOps :
+					printf ( " **** error: no symmetry operations found\n" );
+					break;
+				default :
+					printf ( " **** error: unknown return code from "
+					"CMMDBManager::SetSpaceGroup()\n" );
+				}
+			exit(2);
+		}
+		std::cout << "INFO::ASSIGNED SYM. INFORMATION"<< std::endl;
+	}
+	if ( mmdb -> isCrystInfo() )  {
+		// numerical values are for demonstration only
+		double cell[8];
+		int OC[0];
+    		mmdb->GetCell ( cell[0], cell[1], cell[2], cell[3] , cell[4] , cell[5] , cell[6] , OC[0] );
+		mmdb_N->SetCell ( cell[0], cell[1], cell[2], cell[3] , cell[4] , cell[5] , OC[0] );
+		std::cout << "INFO::ASSIGNED CELL INFORMATION"<< std::endl;
+	}
+	RC = mmdb_N->CrystReady();
+	if ( RC>0 )  {
+		if (RC & CRRDY_NotPrecise)
+			std::cout << "WARNING:: 1 \n" ;
+		if (RC & CRRDY_isTranslation)
+			std::cout << "WARNING:: 2 \n" ;
+		if (RC & CRRDY_NoOrthCode)
+			std::cout << "WARNING:: 3 \n" ;
+	}
+	RC = mmdb_N->GenerateSymMates ( NULL );
+	if (RC>0)  {
+		std::cout << "WARNING:: " << RC <<" \n" ;
+	}
+	return RC;
+}
+
+int
 mmdb_helper::update_residue( int imod, int icha, int ires, CMMDBManager *mmdb0, particles residue ) {
 	PPCAtom	atoms;
 	int 	nAtoms;
@@ -174,10 +225,11 @@ map_manager::assign_map( std::string inp_str ) {
 		std::cout << "INFO:: DONE \nINFO:: CLOSE MTZ" << std::endl;
 	mtzin.close_read();
 	if(verbose)
-		std::cout << "INFO:: DONE IO\nINFO:: SET GRID SAMPLING" << std::endl;
+		std::cout << "INFO:: DONE \nINFO:: SET GRID SAMPLING" << std::endl;
 	m_s_rate_=1.5;
-	clipper::Grid_sampling gs( fphi_.spacegroup(), fphi_.cell(), fphi_.resolution(), m_s_rate_ );
-	xmap_.init	( fphi_.spacegroup(), fphi_.cell(), gs ); 		// INITIALIZE MAP
+//	clipper::Grid_sampling gs( fphi_.spacegroup(), fphi_.cell(), fphi_.resolution(), m_s_rate_ );
+	grid_.init	( fphi_.spacegroup(), fphi_.cell(), fphi_.resolution(), m_s_rate_ );
+	xmap_.init	( fphi_.spacegroup(), fphi_.cell(), grid_ ); 		// INITIALIZE MAP
 	if(verbose)
 		std::cout << "INFO:: DONE GS\nINFO:: CALC FFT" << std::endl;
 	xmap_.fft_from	( fphi_ );
@@ -355,7 +407,7 @@ residue_helper::get_mask( int sw ) {
 }
 
 int
-residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<int,double> > *theta, int nb , int which ) {
+residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling gs, std::vector< std::pair<int,double> > *theta, int nb , int which ) {
 	rich::calc_map cmap;
 	cmap.set_nbins(nb);
 
@@ -363,25 +415,25 @@ residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<
 	gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
 	switch( which ) {
 		case 2:
-			if( cmap.proj(	P , CN , density ,
+			if( cmap.proj00(	P , CN , density ,
 				O2_ , v0_ , rc_ , zc_,
-				theta ) ) {
+				theta, gs ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		case 1:
-			if( cmap.proj(	P , CN , density ,
+			if( cmap.proj00(	P , CN , density ,
 				O1_ , v0_ , rc_ , zc_,
-				theta ) ) {
+				theta, gs ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		default:
-			if( cmap.proj(	P , CN , density ,
+			if( cmap.proj00(	P , CN , density ,
 				OS_ , v0_ , rc_ , zc_,
-				theta ) ) {
+				theta, gs ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
@@ -394,7 +446,7 @@ residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<
 }
 
 int
-residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<int,double> > *theta, int nb , int which, int ires ) {
+residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling gs, std::vector< std::pair<int,double> > *theta, int nb , int which, int ires ) {
 	rich::calc_map cmap;
 	cmap.set_nbins(nb);
 
@@ -402,25 +454,25 @@ residue_helper::calc_proj( clipper::Xmap<float> density, std::vector< std::pair<
 	gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
 	switch( which ) {
 		case 2:
-			if( cmap.proj(	P , CN , density ,
+			if( cmap.proj00(	P , CN , density ,
 				O2_ , v0_ , rc_ , zc_,
-				theta ) ) {
+				theta, gs ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		case 1:
-			if( cmap.proj(	P , CN , density ,
+			if( cmap.proj00(	P , CN , density ,
 				O1_ , v0_ , rc_ , zc_,
-				theta ) ) {
+				theta, gs ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		default:
-			if( cmap.proj(	P , CN , density ,
+			if( cmap.proj00(	P , CN , density ,
 				OS_ , v0_ , rc_ , zc_,
-				theta ) ) {
+				theta, gs ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}

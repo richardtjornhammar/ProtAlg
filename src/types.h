@@ -83,6 +83,7 @@ namespace rich {
 			std::string	atom_resn( char * );
 			int	update_residue	( int, int, int, CMMDBManager*, particles );
 			int	check_clash	( int, int, int, CMMDBManager*, particles , double );
+			int	copy_xtal	( CMMDBManager*, CMMDBManager* );
 		private:
 			;
 	};
@@ -137,8 +138,8 @@ namespace rich {
 			double	calc_O1( particles  ); // particles only r no rw
 			double	calc_O2( particles  ); // particles only r no rw
 			std::vector<double> prune_angles(std::vector< std::pair<int,double> > *, double, int);
-			int	calc_proj( clipper::Xmap<float>, std::vector< std::pair<int,double> > * , int, int );
-			int	calc_proj( clipper::Xmap<float>, std::vector< std::pair<int,double> > * , int, int, int );
+			int	calc_proj( clipper::Xmap<float>, clipper::Grid_sampling gs, std::vector< std::pair<int,double> > * , int, int );
+			int	calc_proj( clipper::Xmap<float>, clipper::Grid_sampling gs, std::vector< std::pair<int,double> > * , int, int, int );
 			void copyA (  gsl_matrix *A ){ if(A->size1==A_->size1&&A->size2==A_->size2){ gsl_matrix_memcpy(A,A_); }; };
 			void copyv0( gsl_vector *v0 ){ if(v0->size==v0_->size){ gsl_vector_memcpy(v0,v0_); }; };
 			void copyOS( gsl_matrix *OS ){ if(OS->size1==OS_->size1&&OS->size2==OS_->size2){ gsl_matrix_memcpy(OS,OS_); }; };
