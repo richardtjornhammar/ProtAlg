@@ -21,11 +21,11 @@ namespace rich {
 
 			int proj   (	gsl_matrix * , gsl_matrix * , clipper::Xmap<float> ,
 					gsl_matrix * , gsl_vector * , double , double,
-					std::vector< std::pair<int,double> > *, clipper::Grid_sampling );
+					std::vector< std::pair<int,double> > * );
 
 			int proj01 (	gsl_matrix * , gsl_matrix * , clipper::Xmap<float> ,
 					gsl_matrix * , gsl_vector * , double , double,
-					std::vector< std::pair<int,double> > *, clipper::Grid_sampling );
+					std::vector< std::pair<int,double> > * );
 
 			int proj00 (	gsl_matrix * , gsl_matrix * , clipper::Xmap<float> ,
 					gsl_matrix * , gsl_vector * , double , double,

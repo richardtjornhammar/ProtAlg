@@ -103,7 +103,7 @@ mmdb_helper::check_clash( int imod, int icha, int iRes, CMMDBManager *MMDB, part
 
 
 int
-mmdb_helper::copy_xtal	( CMMDBManager* mmdb, CMMDBManager* mmdb_N ) {
+mmdb_helper::copy_xtal( CMMDBManager* mmdb, CMMDBManager* mmdb_N ) {
 
 	int RC;
 
@@ -127,17 +127,18 @@ mmdb_helper::copy_xtal	( CMMDBManager* mmdb, CMMDBManager* mmdb_N ) {
 				}
 			exit(2);
 		}
-		std::cout << "INFO::ASSIGNED SYM. INFORMATION"<< std::endl;
+		std::cout << "INFO:: ASSIGNED SYM. INFORMATION"<< std::endl;
 	}
+
 	if ( mmdb -> isCrystInfo() )  {
-		// numerical values are for demonstration only
 		double cell[8];
 		int OC[0];
     		mmdb->GetCell ( cell[0], cell[1], cell[2], cell[3] , cell[4] , cell[5] , cell[6] , OC[0] );
 		mmdb_N->SetCell ( cell[0], cell[1], cell[2], cell[3] , cell[4] , cell[5] , OC[0] );
-		std::cout << "INFO::ASSIGNED CELL INFORMATION"<< std::endl;
+		std::cout << "INFO:: ASSIGNED CELL INFORMATION"<< std::endl;
 	}
 	RC = mmdb_N->CrystReady();
+
 	if ( RC>0 )  {
 		if (RC & CRRDY_NotPrecise)
 			std::cout << "WARNING:: 1 \n" ;
@@ -146,10 +147,13 @@ mmdb_helper::copy_xtal	( CMMDBManager* mmdb, CMMDBManager* mmdb_N ) {
 		if (RC & CRRDY_NoOrthCode)
 			std::cout << "WARNING:: 3 \n" ;
 	}
-	RC = mmdb_N->GenerateSymMates ( NULL );
+//	LOOKS WIERD...
+//	RC = mmdb_N->GenerateSymMates ( NULL );
+
 	if (RC>0)  {
 		std::cout << "WARNING:: " << RC <<" \n" ;
 	}
+
 	return RC;
 }
 
@@ -227,9 +231,10 @@ map_manager::assign_map( std::string inp_str ) {
 	if(verbose)
 		std::cout << "INFO:: DONE \nINFO:: SET GRID SAMPLING" << std::endl;
 	m_s_rate_=1.5;
-//	clipper::Grid_sampling gs( fphi_.spacegroup(), fphi_.cell(), fphi_.resolution(), m_s_rate_ );
-	grid_.init	( fphi_.spacegroup(), fphi_.cell(), fphi_.resolution(), m_s_rate_ );
-	xmap_.init	( fphi_.spacegroup(), fphi_.cell(), grid_ ); 		// INITIALIZE MAP
+	clipper::Grid_sampling gs( fphi_.spacegroup(), fphi_.cell(), fphi_.resolution(), m_s_rate_ );
+	xmap_.init	( fphi_.spacegroup(), fphi_.cell(), gs ); 		// INITIALIZE MAP
+//	grid_.init	( fphi_.spacegroup(), fphi_.cell(), fphi_.resolution(), m_s_rate_ );
+//	xmap_.init	( fphi_.spacegroup(), fphi_.cell(), grid_ ); 		// INITIALIZE MAP
 	if(verbose)
 		std::cout << "INFO:: DONE GS\nINFO:: CALC FFT" << std::endl;
 	xmap_.fft_from	( fphi_ );
@@ -358,8 +363,8 @@ quaternion::rotate_coord( gsl_vector *x )
 			q[XX] = gsl_vector_get(q_,XX); q[YY ] = gsl_vector_get(q_,YY );
 			q[ZZ] = gsl_vector_get(q_,ZZ); q[DIM] = gsl_vector_get(q_,DIM);
 
-			xo[XX] = gsl_vector_get(x, XX); 
-			xo[YY] = gsl_vector_get(x, YY); 
+			xo[XX] = gsl_vector_get(x, XX);
+			xo[YY] = gsl_vector_get(x, YY);
 			xo[ZZ] = gsl_vector_get(x, ZZ);
  
 			xX = 	(q[0]*q[0] + q[1]*q[1]-q[2]*q[2]-q[3]*q[3] )	* xo[XX] + 
@@ -415,26 +420,26 @@ residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling 
 	gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
 	switch( which ) {
 		case 2:
-			if( cmap.proj00(	P , CN , density ,
+			if( cmap.proj01( P , CN , density ,
 				O2_ , v0_ , rc_ , zc_,
-				theta, gs ) ) {
-				std::cout << "ERROR::FAILED" << std::endl;
+				theta ) ) {
+				std::cout << "ERROR:: FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		case 1:
-			if( cmap.proj00(	P , CN , density ,
+			if( cmap.proj01( P , CN , density ,
 				O1_ , v0_ , rc_ , zc_,
-				theta, gs ) ) {
-				std::cout << "ERROR::FAILED" << std::endl;
+				theta ) ) {
+				std::cout << "ERROR:: FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		default:
-			if( cmap.proj00(	P , CN , density ,
+			if( cmap.proj01( P , CN , density ,
 				OS_ , v0_ , rc_ , zc_,
-				theta, gs ) ) {
-				std::cout << "ERROR::FAILED" << std::endl;
+				theta ) ) {
+				std::cout << "ERROR:: FAILED" << std::endl;
 				exit(1);
 			}
 			break;
@@ -454,25 +459,25 @@ residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling 
 	gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
 	switch( which ) {
 		case 2:
-			if( cmap.proj00(	P , CN , density ,
+			if( cmap.proj01(	P , CN , density ,
 				O2_ , v0_ , rc_ , zc_,
-				theta, gs ) ) {
+				theta ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		case 1:
-			if( cmap.proj00(	P , CN , density ,
+			if( cmap.proj01(	P , CN , density ,
 				O1_ , v0_ , rc_ , zc_,
-				theta, gs ) ) {
+				theta ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		default:
-			if( cmap.proj00(	P , CN , density ,
+			if( cmap.proj01(	P , CN , density ,
 				OS_ , v0_ , rc_ , zc_,
-				theta, gs ) ) {
+				theta ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
@@ -509,11 +514,11 @@ std::vector<double>
 residue_helper::prune_angles(std::vector< std::pair<int,double> > * theta, double TOL, int N){ 
 	int verbose=0;
 	std::sort( (*(theta)).begin(), (*(theta)).end(), compare_pid );
-	double val = 100.0, alimit = TOL; //6.7E-2//7.0E-2
+	double val = 100.0, alimit = TOL; 
 	std::vector<double> v_ang;
 	int Ith = (*(theta)).size();
 	do {
-		val		= (*(theta))[Ith-1].second		/ sqrt(float(N));
+		val		= (*(theta))[Ith-1].second;
 		double ang	= (*(theta))[Ith-1].first  * 360.0	/ (float(N));
 		if( verbose )
 			std::cout << "INFO::MAX > " << Ith << " " << ang << " " << val << std::endl;

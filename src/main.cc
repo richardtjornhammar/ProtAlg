@@ -118,7 +118,6 @@ int main ( int argc, char ** argv ) {
 	PCModel		model;
 	PPCChain	chain_T;
 	PPCResidue	resid_T;
-	PPCAtom		atoms_T,atoms_T2;
 	int		nModels;
 	int 		nChains,nResidues,nAtoms,nAtoms2;
 	int		imod,icha,ires,iat;
@@ -149,8 +148,9 @@ int main ( int argc, char ** argv ) {
 		theta.push_back(pid);
 		chi.push_back(pid);
 	}
+
 	int nb		= NBINS_IO;
-	double TOL	= 3E-2;
+	double TOL	= 55E-2;
 
 	for ( imod=1 ; imod<=nModels ; imod++ ) {
 		nChains = mmdb.GetNumberOfChains( imod ); 
@@ -176,13 +176,12 @@ int main ( int argc, char ** argv ) {
 //			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
 //			CALULATE PROJECTION
 				if( (ires == 40 || ires==88) && icha==0 ) {	// TESTCASE
-				//if( 1 ) {
-					if( verbose ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
+					if( 1 ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
 						rich::mat_io mIO;
-						mIO.write_vdbl2dat( theta, "testTheta.dat" );
+						mIO.write_vdbl2dat( theta, "res"+std::to_string(ires)+"NB"+std::to_string(NBINS_IO)+"Theta.dat" );
 					}
 
-					std::vector<double> v_ang = rh.prune_angles( &theta , TOL, nb ); //24 8
+					std::vector<double> v_ang = rh.prune_angles( &theta , TOL, nb ); 
 
 					if( v_ang.size() < 1)
 						continue;
@@ -193,25 +192,20 @@ int main ( int argc, char ** argv ) {
 					gsl_matrix_get_row( nh, OS, 0 );
 					rich::particle_helper parth;
 
+					TOL=(ires==88)?(TOL*0.1):(TOL);
+
 					for(int i_ang=0; i_ang < v_ang.size() ; i_ang++) {
-						// if(i_ang>1)
-						//	continue;
 						rich::particles rotres_atoms0;
 						rich::quaternion q;
-						//double fi = (i_ang==0)?( v_ang[i_ang] ):(v_ang[i_ang]-v_ang[i_ang-1]);
 						q.assign_quaterion( nh , v_ang[i_ang] * M_PI/180.0 );
 						rotres_atoms0 = parth.particles_memcpy( residue_atoms );
 						// q.rotate_particles( residue_atoms , v0 );
 						q.rotate_particles( rotres_atoms0 , v0 );
 
-						if( rh.do2nd() && 1 ) {
-						// UGLY BUT REDO
-						// COPY ROTATED RESIDUE ATOMS AND RECALC
+						if( rh.do2nd() ) {
 							gsl_vector *v00  = gsl_vector_calloc(DIM);
-							
 							rich::particles rotres_atoms1;
-							
-							rotres_atoms1 = parth.particles_memcpy( rotres_atoms0 ); // residue_atoms
+							rotres_atoms1 = parth.particles_memcpy( rotres_atoms0 ); 
 							double zc_rr1 = rh.calc_O1( rotres_atoms1 );
 							rh.copyv0(v00);
 							rh.calc_proj( density, mmap.get_gsa(), &chi , nb , 1 );
@@ -228,7 +222,7 @@ int main ( int argc, char ** argv ) {
 									if(1)
 										std::cout << "INFO::WE HAVE A BAD MASK" << std::endl;		
 								qq.rotate_particles( rotres_atoms1 , v00 , mask );
-								if( mmhelp.check_clash( 1 , icha, ires, &mmdb_N, rotres_atoms1, 1.0 ) > 1 ) {
+								if( mmhelp.check_clash( 1 , icha, ires, &mmdb, rotres_atoms1, 1.2 ) > 1 ) {
 									if(verbose)
 										std::cout << "INFO::WE HAVE CLASH" << std::endl;
 								} else {
@@ -236,9 +230,16 @@ int main ( int argc, char ** argv ) {
 									model->Copy( model_T[0] );
 									NM++;
 									mmdb_N.AddModel( model  );
-									if( mmhelp.update_residue( 1 ,icha ,ires, &mmdb_N, rotres_atoms1 ) ) {
+									if( mmhelp.update_residue( NM ,icha ,ires, &mmdb_N, rotres_atoms1 ) ) {
 										std::cout << "::ERROR::" << std::endl;
 										fatal();
+									}
+									if( verbose == 2 ) {
+										char a_inf[256];
+										PPCAtom		atoms_T,atoms_T2;
+										mmdb_N.GetAtomTable    ( NM , icha ,ires , atoms_T, nAtoms );
+										atoms_T[0]->GetAtomID(a_inf);
+										std::cout << "INFO:1: " << a_inf << std::endl; 
 									}
 								}
 							}
@@ -257,6 +258,13 @@ int main ( int argc, char ** argv ) {
 								std::cout << "::ERROR::" << std::endl;
 								fatal();
 							}
+							if( verbose == 2 ) {
+								char a_inf[256];
+								PPCAtom	 atoms_T,atoms_T2;
+								mmdb_N.GetAtomTable    ( NM , icha ,ires , atoms_T, nAtoms );
+								atoms_T[0]->GetAtomID(a_inf);
+								std::cout << "INFO:0: " << a_inf << std::endl; 
+							}	
 						}
 						
 						if( verbose ) {
@@ -290,10 +298,11 @@ int main ( int argc, char ** argv ) {
 	}
 
 	mmdb_N.GetModelTable( model_T, nModels );
-	std::cout << "INFO::GENERATED "<<nModels<<" MODELS"<< NM << std::endl;
+	std::cout << "INFO::GENERATED " << nModels << " MODELS (" << NM << ")" << std::endl;
 	mmdb_N.FinishStructEdit();
-	mmdb_N.WritePDBASCII( "multistate.pdb" );
-	std::cout <<"INFO>> " << 0/1E-10 << std::endl;
+	if(nModels>0)
+		mmdb_N.WritePDBASCII( "state.pdb" );
+
 	return 0;
 }
 
