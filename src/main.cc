@@ -165,7 +165,7 @@ int main ( int argc, char ** argv ) {
 				if(rh.skip())
 					continue;
 				
-				if( (ires == 40 || ires==88) && icha==0)
+				if( (ires == 40 || ires==88) && icha==0 || verbose )
 					rh.calc_proj( density, mmap.get_gsa(), &theta , nb , 0 , ires );
 				else
 					rh.calc_proj( density, mmap.get_gsa(), &theta , nb , 0 );
@@ -176,7 +176,7 @@ int main ( int argc, char ** argv ) {
 //			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
 //			CALULATE PROJECTION
 				if( (ires == 40 || ires==88) && icha==0 ) {	// TESTCASE
-					if( 1 ) {			// REALLY A DIAGNOSTICS TOOL, VERBOSE
+					if( verbose ) {			
 						rich::mat_io mIO;
 						mIO.write_vdbl2dat( theta, "res"+std::to_string(ires)+"NB"+std::to_string(NBINS_IO)+"Theta.dat" );
 					}
@@ -199,7 +199,6 @@ int main ( int argc, char ** argv ) {
 						rich::quaternion q;
 						q.assign_quaterion( nh , v_ang[i_ang] * M_PI/180.0 );
 						rotres_atoms0 = parth.particles_memcpy( residue_atoms );
-						// q.rotate_particles( residue_atoms , v0 );
 						q.rotate_particles( rotres_atoms0 , v0 );
 
 						if( rh.do2nd() ) {
@@ -208,7 +207,7 @@ int main ( int argc, char ** argv ) {
 							rotres_atoms1 = parth.particles_memcpy( rotres_atoms0 ); 
 							double zc_rr1 = rh.calc_O1( rotres_atoms1 );
 							rh.copyv0(v00);
-							rh.calc_proj( density, mmap.get_gsa(), &chi , nb , 1 );
+							rh.calc_proj( density, mmap.get_gsa(), &chi , nb , 1 , ires);
 							std::vector<double> v_chi = rh.prune_angles( &chi , TOL, nb );
 							gsl_matrix *O1	= gsl_matrix_calloc( DIM, DIM );
 							rh.copyO1(O1);
@@ -219,7 +218,7 @@ int main ( int argc, char ** argv ) {
 								qq.assign_quaterion( ph , v_chi[i_chi] * M_PI/180.0 );
 								std::vector<bool> mask = rh.get_mask(0);
 								if(mask.size()!=rotres_atoms1.size() )
-									if(1)
+									if(verbose)
 										std::cout << "INFO::WE HAVE A BAD MASK" << std::endl;		
 								qq.rotate_particles( rotres_atoms1 , v00 , mask );
 								if( mmhelp.check_clash( 1 , icha, ires, &mmdb, rotres_atoms1, 1.2 ) > 1 ) {
@@ -267,12 +266,12 @@ int main ( int argc, char ** argv ) {
 							}	
 						}
 						
-						if( verbose ) {
+						if( verbose == 2 ) {
 							fIO.output_pdb( "rotres" + std::to_string(i_ang) + ".pdb" , residue_atoms );
 						}
 					}
 
-					if ( verbose ) { 
+					if ( verbose == 2 ) { 
 						std::vector<std::string> vs;
 						vs.push_back("Ga"); 
 						vs.push_back("In"); 

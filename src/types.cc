@@ -412,7 +412,9 @@ residue_helper::get_mask( int sw ) {
 }
 
 int
-residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling gs, std::vector< std::pair<int,double> > *theta, int nb , int which ) {
+residue_helper::calc_proj(	clipper::Xmap<float> density, clipper::Grid_sampling gs, 
+				std::vector< std::pair<int,double> > *theta,
+				int nb , int which ) {
 	rich::calc_map cmap;
 	cmap.set_nbins(nb);
 
@@ -421,16 +423,16 @@ residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling 
 	switch( which ) {
 		case 2:
 			if( cmap.proj01( P , CN , density ,
-				O2_ , v0_ , rc_ , zc_,
-				theta ) ) {
+					 O2_ , v0_ , rc_ , zc_,
+					 theta ) ) {
 				std::cout << "ERROR:: FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		case 1:
 			if( cmap.proj01( P , CN , density ,
-				O1_ , v0_ , rc_ , zc_,
-				theta ) ) {
+					 O1_ , v0_ , rc_ , zc_,
+					 theta ) ) {
 				std::cout << "ERROR:: FAILED" << std::endl;
 				exit(1);
 			}
@@ -451,7 +453,9 @@ residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling 
 }
 
 int
-residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling gs, std::vector< std::pair<int,double> > *theta, int nb , int which, int ires ) {
+residue_helper::calc_proj (	clipper::Xmap<float> density, clipper::Grid_sampling gs, 
+				std::vector< std::pair<int,double> > *theta, int nb , 
+				int which, int ires ) {
 	rich::calc_map cmap;
 	cmap.set_nbins(nb);
 
@@ -459,25 +463,25 @@ residue_helper::calc_proj( clipper::Xmap<float> density, clipper::Grid_sampling 
 	gsl_matrix *CN	= gsl_matrix_calloc(	nb, nb	 );
 	switch( which ) {
 		case 2:
-			if( cmap.proj01(	P , CN , density ,
-				O2_ , v0_ , rc_ , zc_,
-				theta ) ) {
+			if( cmap.proj01( P , CN , density ,
+					 O2_ , v0_ , rc_ , zc_,
+					 theta ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		case 1:
-			if( cmap.proj01(	P , CN , density ,
-				O1_ , v0_ , rc_ , zc_,
-				theta ) ) {
+			if( cmap.proj01( P , CN , density ,
+					 O1_ , v0_ , rc_ , zc_,
+					 theta ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
 			break;
 		default:
-			if( cmap.proj01(	P , CN , density ,
-				OS_ , v0_ , rc_ , zc_,
-				theta ) ) {
+			if( cmap.proj01( P , CN , density ,
+					 OS_ , v0_ , rc_ , zc_,
+					 theta ) ) {
 				std::cout << "ERROR::FAILED" << std::endl;
 				exit(1);
 			}
