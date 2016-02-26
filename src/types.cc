@@ -392,6 +392,43 @@ quaternion::rotate_coord( gsl_vector *x )
 	}
 }
 
+double
+residue_helper::calc_fi( particles rfull, int I ) { 
+	double fi = 0.0, cosfi=0.0;
+	gsl_vector *r0 = gsl_vector_calloc(DIM);
+
+	for( int i=0 ; i<rfull.size() ; i++ ){
+		gsl_vector *r = gsl_vector_calloc(DIM);
+		gsl_vector_memcpy( r, rfull[i].second );
+		if(	(I==2) && (i==CA_||i==CB_||i<=CG_||i==N_||i==C_||i==O_) ||
+			(I==1) && (i==CA_||i==CB_|| i==N_||i==C_||i==O_) )
+			continue;
+		gsl_vector_add( r0, r );
+	}
+	gsl_matrix *O = gsl_matrix_calloc(DIM,DIM);
+	switch( I ) {
+		case 2:
+			copyO2(O);
+			break;
+		case 1:
+			copyO1(O);
+			break;
+		default:
+			copyOS(O);
+	}
+	double nrm	= gsl_blas_dnrm2( r0 );
+	gsl_vector_scale( r0 , 1.0/nrm );
+	gsl_vector *d 	= gsl_vector_calloc(DIM);
+	gsl_matrix_get_row( d , O , 1 );
+	gsl_blas_ddot(d,r0,&cosfi);
+	fi = acos(cosfi);
+	gsl_matrix_free(  O );
+	gsl_vector_free(  d );
+	gsl_vector_free( r0 );
+
+	return fi;
+}
+
 std::vector<bool> 
 residue_helper::get_mask( int sw ) {
 	std::vector<bool> mask;
@@ -408,7 +445,6 @@ residue_helper::get_mask( int sw ) {
 			break;
 	}
 	return mask;
-
 }
 
 int
@@ -453,7 +489,7 @@ residue_helper::calc_proj(	clipper::Xmap<float> density, clipper::Grid_sampling 
 }
 
 int
-residue_helper::calc_proj (	clipper::Xmap<float> density, clipper::Grid_sampling gs, 
+residue_helper::calc_proj(	clipper::Xmap<float> density, clipper::Grid_sampling gs, 
 				std::vector< std::pair<int,double> > *theta, int nb , 
 				int which, int ires ) {
 	rich::calc_map cmap;
@@ -488,7 +524,7 @@ residue_helper::calc_proj (	clipper::Xmap<float> density, clipper::Grid_sampling
 			break;
 	}
 	rich::mat_io	mio;
-	mio.write_gsl2datn(P, CN, "resP"+ std::to_string(ires) +".dat" );
+	mio.write_gsl2datn(P, CN, "res"+std::to_string(which)+"P"+ std::to_string(ires) +".dat" );
 	gsl_matrix_free(P);
 	gsl_matrix_free(CN);
 

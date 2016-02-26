@@ -134,8 +134,8 @@ calc_map::proj01(	gsl_matrix *P , gsl_matrix *C , clipper::Xmap<float> EDENS,
 	gsl_vector *z1		= gsl_vector_calloc(DIM);
 
 	gsl_matrix_get_row( zh , OS , 0 );
-	gsl_matrix_get_row( xh , OS , 1 );
-	gsl_matrix_get_row( yh , OS , 2 );
+	gsl_matrix_get_row( xh , OS , 1 );//1
+	gsl_matrix_get_row( yh , OS , 2 );//2
 
 	if(P->size1!=P->size2 || P->size1 != nbins_ )
 		return 1;

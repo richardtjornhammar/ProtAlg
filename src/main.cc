@@ -164,8 +164,8 @@ int main ( int argc, char ** argv ) {
 				double zc = rh.calc_OS();			// CALCULATE ORTHONORMAL SYSTEM
 				if(rh.skip())
 					continue;
-				
-				if( (ires == 40 || ires==88) && icha==0 || verbose )
+
+				if( (ires == 40 || ires==88) && icha==0 && verbose == 2)
 					rh.calc_proj( density, mmap.get_gsa(), &theta , nb , 0 , ires );
 				else
 					rh.calc_proj( density, mmap.get_gsa(), &theta , nb , 0 );
@@ -174,11 +174,13 @@ int main ( int argc, char ** argv ) {
 				rh.copyv0(v0);
 
 //			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
-//			CALULATE PROJECTION
+//			CALCULATE PROJECTION
 				if( (ires == 40 || ires==88) && icha==0 ) {	// TESTCASE
+
 					if( verbose ) {			
 						rich::mat_io mIO;
-						mIO.write_vdbl2dat( theta, "res"+std::to_string(ires)+"NB"+std::to_string(NBINS_IO)+"Theta.dat" );
+						mIO.write_vdbl2dat( theta, "res"+std::to_string(ires) +
+							 "NB" + std::to_string(NBINS_IO) + "Theta.dat" );
 					}
 
 					std::vector<double> v_ang = rh.prune_angles( &theta , TOL, nb ); 
@@ -195,6 +197,7 @@ int main ( int argc, char ** argv ) {
 					TOL=(ires==88)?(TOL*0.1):(TOL);
 
 					for(int i_ang=0; i_ang < v_ang.size() ; i_ang++) {
+
 						rich::particles rotres_atoms0;
 						rich::quaternion q;
 						q.assign_quaterion( nh , v_ang[i_ang] * M_PI/180.0 );
@@ -202,28 +205,32 @@ int main ( int argc, char ** argv ) {
 						q.rotate_particles( rotres_atoms0 , v0 );
 
 						if( rh.do2nd() ) {
+
 							gsl_vector *v00  = gsl_vector_calloc(DIM);
 							rich::particles rotres_atoms1;
 							rotres_atoms1 = parth.particles_memcpy( rotres_atoms0 ); 
 							double zc_rr1 = rh.calc_O1( rotres_atoms1 );
 							rh.copyv0(v00);
+
 							rh.calc_proj( density, mmap.get_gsa(), &chi , nb , 1 , ires);
+
 							std::vector<double> v_chi = rh.prune_angles( &chi , TOL, nb );
 							gsl_matrix *O1	= gsl_matrix_calloc( DIM, DIM );
 							rh.copyO1(O1);
 							gsl_matrix_get_row( ph, O1, 0 );
+							double chi0 = rh.calc_fi(rotres_atoms1,1);//HERE
+
 							for(int i_chi=0; i_chi < v_chi.size() ; i_chi++) {
 								rich::quaternion qq;
-								double phi = (i_chi==0)?( v_chi[i_chi] ):(v_chi[i_chi]-v_chi[i_chi-1]);
-								qq.assign_quaterion( ph , v_chi[i_chi] * M_PI/180.0 );
+								qq.assign_quaterion( ph , (v_chi[i_chi]-chi0) * M_PI/180.0 );
 								std::vector<bool> mask = rh.get_mask(0);
-								if(mask.size()!=rotres_atoms1.size() )
+								if( mask.size()!=rotres_atoms1.size() )
 									if(verbose)
-										std::cout << "INFO::WE HAVE A BAD MASK" << std::endl;		
+										std::cout << "INFO:: WE HAVE A BAD MASK" << std::endl;		
 								qq.rotate_particles( rotres_atoms1 , v00 , mask );
 								if( mmhelp.check_clash( 1 , icha, ires, &mmdb, rotres_atoms1, 1.2 ) > 1 ) {
 									if(verbose)
-										std::cout << "INFO::WE HAVE CLASH" << std::endl;
+										std::cout << "INFO:: WE HAVE CLASH" << std::endl;
 								} else {
 									model = newCModel(	);
 									model->Copy( model_T[0] );
@@ -235,25 +242,24 @@ int main ( int argc, char ** argv ) {
 									}
 									if( verbose == 2 ) {
 										char a_inf[256];
-										PPCAtom		atoms_T,atoms_T2;
+										PPCAtom		atoms_T, atoms_T2;
 										mmdb_N.GetAtomTable    ( NM , icha ,ires , atoms_T, nAtoms );
 										atoms_T[0]->GetAtomID(a_inf);
 										std::cout << "INFO:1: " << a_inf << std::endl; 
 									}
 								}
 							}
-
 						}
 
 						if( mmhelp.check_clash( NM, icha, ires, &mmdb_N, rotres_atoms0, 1.0 ) > 1 ) {
 							if(verbose)
-								std::cout << "INFO::WE HAVE CLASH" << std::endl;
+								std::cout << "INFO:: WE HAVE CLASH" << std::endl;
 						} else {
 							model = newCModel(	);
 							model->Copy( model_T[0] );
 							NM++;
 							mmdb_N.AddModel( model  ); 
-							if( mmhelp.update_residue( NM ,icha ,ires, &mmdb_N, rotres_atoms0 ) ) {
+							if( mmhelp.update_residue( NM , icha , ires, &mmdb_N, rotres_atoms0 ) ) {
 								std::cout << "::ERROR::" << std::endl;
 								fatal();
 							}
@@ -297,7 +303,7 @@ int main ( int argc, char ** argv ) {
 	}
 
 	mmdb_N.GetModelTable( model_T, nModels );
-	std::cout << "INFO::GENERATED " << nModels << " MODELS (" << NM << ")" << std::endl;
+	std::cout << "INFO:: GENERATED " << nModels << " MODELS (" << NM << ")" << std::endl;
 	mmdb_N.FinishStructEdit();
 	if(nModels>0)
 		mmdb_N.WritePDBASCII( "state.pdb" );
