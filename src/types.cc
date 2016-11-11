@@ -101,6 +101,575 @@ mmdb_helper::check_clash( int imod, int icha, int iRes, CMMDBManager *MMDB, part
 	return nSelAtoms;
 }
 
+int
+mmdb_helper::remove_sym(void) {
+	if(1)
+		std::cout << " \t \t " << nChains0_ << " \t \t " << nChainsS_ << std::endl;
+	int  selHndl = mmdb_ -> NewSelection();
+	int imod=1 ; 
+	if(	has_manager() && has_cell()	)
+	{
+		int nChains = mmdb_ -> GetNumberOfChains( imod ); // NOT NEEDED
+		for ( int icha = nChains0_ ; icha < nChainsS_ ; icha++ ) { 
+			const char cid[1] = { (char) ( icha+'A' ) };
+			mmdb_ -> Select	(	selHndl , STYPE_ATOM , imod, cid,
+               			ANY_RES , "*",  ANY_RES , "*",
+				"*", "*", "*", "*",  SKEY_OR	);
+		}
+		mmdb_ -> DeleteSelObjects(selHndl);
+	} 	
+	mmdb_ -> FinishStructEdit();
+	return 0;
+}
+
+int
+mmdb_helper::generate_sym( void ) {
+	int value = -1, natoms=0;
+	PPCAtom atoms;
+	if( has_manager() ) {
+		double	a , b , c , alf , bet , gam , cell_vol ;
+		int 	ivol ;
+		mmdb_ -> GetCell	( a , b , c , alf , bet , gam , cell_vol , ivol );
+		nChains0_ = mmdb_ -> GetNumberOfChains( 1 );
+		if( 0 ) {
+			std::cout << "INFORMATION::WILL TRY TO RETRIEVE CELL INFO" << std::endl;
+			std::cout << "INFORMATION::GOT" 
+				<< " " << a	<< " " << b	<< " " << c
+				<< " " << alf	<< " " << bet	<< " " << gam << std::endl;
+		}
+		if ( mmdb_ -> isSpaceGroup() )  {
+			char *sg_str	= mmdb_ 	-> GetSpaceGroup();
+			int RC		= mmdb_ 	-> SetSpaceGroup ( sg_str );
+			if( 0 ) {
+				std::cout << "INFORMATION::WILL TRY TO RETRIEVE SYM INFO" << std::endl;
+				std::cout << "INFORMATION::GOT " << sg_str << std::endl;
+			}
+		}
+		const double 		cfa=a, cfb=b, cfc=c, cfalf=alf, cfbet=bet, cfgam=gam;
+		clipper::Cell_descr 	celld		( cfa , cfb , cfc , cfalf , cfbet , cfgam );
+		clipper::Cell loc_cell( celld );
+		loc_cell_ = loc_cell;
+		bHaveCell_ = 1;
+		// GET ASU 
+		int SelHndl 	= mmdb_ -> NewSelection();
+		mmdb_ -> Select	(	SelHndl , STYPE_ATOM , 1, "*",
+               				ANY_RES , "*",  ANY_RES , "*",
+					"*", "*", "*", "*",  SKEY_NEW	);
+		mmdb_ -> GetSelIndex (	SelHndl , atoms	, natoms	);
+		nAsuAts_	= natoms;
+		// GENERATE UNI
+		int RC		= mmdb_ -> GenerateSymMates( NULL );
+		mmdb_ -> PDBCleanup (  PDBCLEAN_CHAIN_STRONG |  PDBCLEAN_SERIAL );
+		nChainsS_ = mmdb_ -> GetNumberOfChains( 1 );
+		if( 1 ) {
+			switch ( RC )  {
+				case  GSM_Ok       : 
+					break; 
+				case  GSM_NoSymOps : 
+					std::cout << " *** error: no symmetry operations "
+			                          << "found\n";	
+					break;
+				case  GSM_NoTransfMatrices :
+					std::cout << " *** error: Fractionalization/"
+			                          << "Orthogonalization is not defined\n";
+					break;
+				case  GSM_NoCell   : 
+					std::cout << " *** error: No cell parameters were"
+			                          << " set up\n";
+					break;
+				default :
+					std::cout << " *** error: unknown return from "
+						  << "CMMDBManager::GenerateSymMates()\n";
+			}
+		}
+		bHaveAsu_ 	= RC==GSM_Ok || !(RC==GSM_NoCell) ;
+		bHaveUni_ 	= bHaveAsu_;
+		value		= RC;
+		SelHndl 	= mmdb_ -> NewSelection();
+		mmdb_ -> Select	(	SelHndl , STYPE_ATOM , 1, "*",
+               				ANY_RES , "*",  ANY_RES, "*",
+					"*", "*", "*", "*",  SKEY_NEW	);
+		mmdb_ -> GetSelIndex (	SelHndl , atoms , natoms	);
+		nUniAts_=natoms;
+	}
+
+	return value;
+}
+
+double
+mmdb_helper::min_dist( int im, int ic, int ir , particles molecule ) 
+{
+	// 
+	// RETURNS MINDIST OF SUPPLIED PARTICLES 
+	// CORRESPONDING TO IM, IC, IR IN THE MANAGER
+	// 
+	double min_dist=-1.0;
+	int iel[3][12];
+	iel[0][ 0]= 0 , iel[1][ 0]= 0 , iel[2][ 0]= 0;
+	iel[0][ 1]= 1 , iel[1][ 1]= 0 , iel[2][ 1]= 0;
+	iel[0][ 2]= 0 , iel[1][ 2]= 1 , iel[2][ 2]= 0;
+	iel[0][ 3]= 0 , iel[1][ 3]= 0 , iel[2][ 3]= 1;
+	iel[0][ 4]= 1 , iel[1][ 4]= 1 , iel[2][ 4]= 0;
+	iel[0][ 5]= 1 , iel[1][ 5]= 0 , iel[2][ 5]= 1;
+	iel[0][ 6]= 0 , iel[1][ 6]= 1 , iel[2][ 6]= 1;
+	iel[0][ 7]= 1 , iel[1][ 7]= 1 , iel[2][ 7]= 1;
+	iel[0][ 8]=-1 , iel[1][ 8]= 0 , iel[2][ 8]= 0;
+	iel[0][ 9]= 0 , iel[1][ 9]=-1 , iel[2][ 9]= 0;
+	iel[0][10]= 0 , iel[1][10]= 0 , iel[2][10]=-1;
+	iel[0][11]=-1 , iel[1][11]=-1 , iel[2][11]=-1;
+
+	if( has_manager() && has_unitcell() && has_symmetry() ) 
+	{
+		clipper::Mat33< double > MF 	= loc_cell_.matrix_frac();
+		clipper::Mat33< double > MO 	= loc_cell_.matrix_orth();
+		PPCAtom	UNI_atoms;
+		int	nUNIatoms;
+		int	SelHndl	= mmdb_ -> NewSelection();
+
+		mmdb_ 	-> Select(	SelHndl , STYPE_ATOM , im , "*" ,
+               				ANY_RES , "*" ,  ANY_RES , "*" ,
+					"*" , "*" , "*" , "*" ,  SKEY_NEW );
+		// CLEAR SELF BUT NOT NEIGHBOURING BACKBONE ATOMS
+		const char ci[1] = { (char) ( ic + (int)'A' ) };
+		mmdb_ 	-> Select( 	SelHndl , STYPE_ATOM , im , ci ,
+               				ir , "*" ,  ir , "*" ,
+					"*" , "*" , "*" , "*" , SKEY_CLR );
+		if( ir-1>0 ) // NEIGHBOUR BACKBONE
+			mmdb_ 	-> Select( 	SelHndl , STYPE_ATOM , im , ci ,
+               					ir-1 , "*" ,  ir-1 , "*" ,
+						"*" , "C,N" , "C,N" , "*" , SKEY_CLR );
+		if( ir+1<0 ) // NEIGHBOUR BACKBONE
+			mmdb_ 	-> Select( 	SelHndl , STYPE_ATOM , im , ci ,
+               					ir+1 , "*" ,  ir+1 , "*" ,
+						"*" , "C,N" , "C,N" , "*" , SKEY_CLR );
+		mmdb_ 	-> GetAtomTable( UNI_atoms, nUNIatoms );	
+		std::pair< int , int > nCellAtoms = get_natoms(); 	
+		
+		double	d_atom0	= 0.0	 ,
+			d_atom	= 1.0E+3 ;
+		
+		for(int i=0 ; i<nUNIatoms ; i++ ) {
+			clipper::Vec3< double > 
+				unicord( UNI_atoms[i] -> x ,
+					 UNI_atoms[i] -> y ,
+					 UNI_atoms[i] -> z );
+
+			for( int k=0; k<molecule.size(); k++ )
+			{
+				clipper::Vec3 < double > parcord(	gsl_vector_get( molecule[k].second, XX ) ,
+									gsl_vector_get( molecule[k].second, YY ) ,
+									gsl_vector_get( molecule[k].second, ZZ ) );
+
+				clipper::Vec3 < double > vdr = unicord-parcord;
+				clipper::Vec3 < double > resvec, vcell;
+				resvec		= MF * vdr;
+				int nn		= round( resvec[0] );
+				int mm 		= round( resvec[1] );
+				int kk 		= round( resvec[2] );
+				clipper::Coord_orth minvec;
+				for ( int ish=0 ; ish<12 ; ish++ ) {
+					clipper::Vec3 < double > vnmk( nn + iel[0][ish], mm + iel[1][ish], kk + iel[2][ish]);
+					vcell	=  MO * vnmk;
+					clipper::Coord_orth kmnv ( vcell );
+					clipper::Coord_orth diffc( vdr-vcell );
+					d_atom0	= sqrt( diffc.lengthsq() );
+					d_atom	= d_atom0<d_atom?d_atom0:d_atom;
+				}
+			}
+		}
+		min_dist = d_atom; 
+	}
+
+	return min_dist;
+}
+
+
+int
+mmdb_helper::check_clash_sym( int imod, int icha, int ires, CMMDBManager *mmdb_mol, particles residue, double clashdist ) 
+{
+	int rv=0;
+	if( ! has_manager(	) ) {
+		set_manager( mmdb_mol );
+		generate_sym( );
+	}
+	if( ! has_cell(		) ) {
+		generate_sym( );
+	}
+	double	mdist = min_dist ( imod, icha , ires , residue );
+
+	rv = mdist<clashdist;
+
+	return ( rv );
+
+}	
+/*
+	// a shift array
+	int iel[3][12];
+	iel[0][ 0]= 0,iel[1][ 0]= 0,iel[2][ 0]= 0;
+	iel[0][ 1]= 1,iel[1][ 1]= 0,iel[2][ 1]= 0;
+	iel[0][ 2]= 0,iel[1][ 2]= 1,iel[2][ 2]= 0;
+	iel[0][ 3]= 0,iel[1][ 3]= 0,iel[2][ 3]= 1;
+	iel[0][ 4]= 1,iel[1][ 4]= 1,iel[2][ 4]= 0;
+	iel[0][ 5]= 1,iel[1][ 5]= 0,iel[2][ 5]= 1;
+	iel[0][ 6]= 0,iel[1][ 6]= 1,iel[2][ 6]= 1;
+	iel[0][ 7]= 1,iel[1][ 7]= 1,iel[2][ 7]= 1;
+	iel[0][ 8]=-1,iel[1][ 8]= 0,iel[2][ 8]= 0;
+	iel[0][ 9]= 0,iel[1][ 9]=-1,iel[2][ 9]= 0;
+	iel[0][10]= 0,iel[1][10]= 0,iel[2][10]=-1;
+	iel[0][11]=-1,iel[1][11]=-1,iel[2][11]=-1;
+
+	bool 	debug = false	;
+
+	//	FIRST WE GENERATE ALL THE SYMMETRY MATES
+	//	CELLPOSITION DOESN'T MATTER
+//	BUILD LOCAL THIN
+	CMMDBManager		 *mmdb0, mmdbm;
+	mmdb0		=	&(mmdbm);
+	PPCAtom		 cur_atoms;
+	PPCModel		 model;
+	int nModels	= 0;
+	int selHnd	= mmdb_mol -> NewSelection();
+	int nAtoms	= 0;
+	mmdb_mol	->	GetModelTable ( model , nModels );
+
+	double a, b, c, alf, bet, gam, cell_vol;
+	int ivol;
+	if ( mmdb_mol -> isCrystInfo( ) ) {
+		mmdb_mol -> GetCell	( a , b , c , alf , bet , gam , cell_vol , ivol );
+		if( debug ) {
+			std::cout << "INFORMATION::WILL TRY TO RETRIEVE CELL INFO" << std::endl;
+			std::cout << "INFORMATION::GOT" 
+				<< " " << a	<< " " << b	<< " " << c
+				<< " " << alf	<< " " << bet	<< " " << gam << std::endl;
+		}
+	}
+	if ( mmdb_mol -> isSpaceGroup() )  {
+		char *sg_str	= mmdb_mol	-> GetSpaceGroup();
+		int RC		= 	mmdb0	-> SetSpaceGroup ( sg_str );
+		if( debug ) {
+			std::cout << "INFORMATION::WILL TRY TO RETRIEVE SYM INFO" << std::endl;
+			std::cout << "INFORMATION::GOT " << sg_str << std::endl;
+		}
+	}
+	const double 		cfa=a, cfb=b, cfc=c, cfalf=alf, cfbet=bet, cfgam=gam;
+	clipper::Cell_descr 	celld		( cfa , cfb , cfc , cfalf , cfbet , cfgam );
+	clipper::Cell 		loc_cell	( celld );
+	if( debug ) {
+		std::cout 	<< "INFORMATION::CELLD"	<< celld.format()	<< "\n"
+				<< " " << celld.a()	<< " "	<< celld.b()	<< " " << celld.c()
+				<< " " << celld.alpha()	<< " "	<< celld.beta()	<< " " << celld.gamma() << std::endl;
+		std::cout	<< "INFORMATION::LCELL" << loc_cell.format()	<< "\n"
+				<< " " << loc_cell.a()	<< " "	<< loc_cell.b()	<< " " << loc_cell.c()
+				<< " " << loc_cell.alpha()	<< " " << loc_cell.beta()	<< " " << loc_cell.gamma() << std::endl;
+	}
+
+	int nsymops = mmdb0	-> GetNumberOfSymOps();
+	mmdb0 -> SetCell	( a , b , c , alf , bet , gam , ivol );
+	mmdb0 -> DeleteAllModels(  );
+	mmdb0 -> AddModel	( model[imod] );
+
+	PPCAtom		ASU_atoms , UNI_atoms;
+	int		nASUatoms , nUNIatoms;
+	int		SelHndl		= mmdb0 -> NewSelection();
+	mmdb0 		-> Select( SelHndl , STYPE_ATOM , "/0" , SKEY_NEW) ; // everything
+	mmdb0 		-> GetAtomTable(ASU_atoms,nASUatoms);
+	int RC		= mmdb0 -> GenerateSymMates( NULL );
+	if( debug ) {
+		switch ( RC )  {
+			case  GSM_Ok       : 
+				break; 
+			case  GSM_NoSymOps : 
+				std::cout << " *** error: no symmetry operations "
+	                                  << "found\n";	
+				break;
+			case  GSM_NoTransfMatrices :
+				std::cout << " *** error: Fractionalization/"
+	                                  << "Orthogonalization is not defined\n";
+				break;
+			case  GSM_NoCell   : 
+				std::cout << " *** error: No cell parameters were"
+	                                  << " set up\n";
+				break;
+			default :
+				std::cout << " *** error: unknown return from "
+					  << "CMMDBManager::GenerateSymMates()\n";
+		}
+		mmdb0 -> PDBCleanup (  PDBCLEAN_CHAIN_STRONG |  PDBCLEAN_SERIAL );
+	}
+
+//	std::size_t found	=  chainid.find_first_of("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+//	char cid[1]		= {chainid[found]};
+
+	int icid		= icha;
+	char cid		= (char)(icid+(int)'A');
+
+	SelHndl = mmdb0 -> NewSelection();
+	//
+	////	BELOW SELECTION CONTAINS ALL ATOMS IN UNITCELL
+	//
+	mmdb0 -> Select	(	SelHndl , STYPE_ATOM , 1, "*",
+               			ANY_RES , "*",  ANY_RES, "*",
+				"*", "*", "*", "*",  SKEY_NEW	);
+	mmdb0 -> GetSelIndex ( SelHndl , UNI_atoms , nUNIatoms	);
+
+	//	debug = true	;
+//
+//	PPCAtom		SelAtom;
+//	int		RC,selHnd,nSelAtoms,nAtoms;
+//	int		nRes = MMDB->GetNumberOfResidues(imod,icha);
+//	nAtoms = residue.size();
+//	selHnd = MMDB->NewSelection();
+//
+//	std::pair<double, clipper::Coord_orth> rotamer_info 
+//						= get_minimol_pos( a_rotamer );
+//	double max_dev_residue_pos 		= rotamer_info.first ;
+//	clipper::Coord_orth mean_residue_pos	= rotamer_info.second;
+//
+//
+//	NEEDS CLEVER DESELECTION
+//		WANT EVERYTHING EXCEPT BONDED ATOMS 
+//		BUT WE DON'T HAVE ANY TOPOLOGY INFO
+//
+	std::vector< clipper::Coord_orth >	v_close_rats;
+	std::vector< std::string > 		v_rat_labels;
+	clipper::Mat33< double > MF 	= loc_cell.matrix_frac();
+	clipper::Mat33< double > MO 	= loc_cell.matrix_orth();
+	if ( debug ) {
+		std::cout << "HAVE MATRIX MO :: \n" << MO.format() << std::endl;
+		std::cout << "HAVE MATRIX MF :: \n" << MF.format() << std::endl;
+	}
+	double	d_atom	= 000.00;
+	clipper::Vec3< double > 
+		meancor( mean_residue_pos.x()  ,
+			 mean_residue_pos.y()  ,
+			 mean_residue_pos.z() );
+
+	double rat_cutoff	= 5.0;
+//	----------	
+//	BELOW IS THE CORRECT CLASH STATE ALGEBRA (SYMMETRY IMAGES INCLUDED!)
+//	HOWEVER MUST DESELECT SELF FROM CLASH SPACE
+//	----------	
+	for(int i=0; i<nUNIatoms; i++ ) {
+		clipper::Vec3< double > 
+			unicord( UNI_atoms[i] -> x,
+				 UNI_atoms[i] -> y,
+				 UNI_atoms[i] -> z );
+		clipper::Vec3 < double > vdr = unicord-meancor;
+		clipper::Vec3 < double > resvec, vcell;
+		char rcp[256];
+		UNI_atoms[i] -> GetAtomID ( rcp );
+		std::string 	rat_id(rcp);
+		resvec		= MF * vdr;
+		int nn		= round( resvec[0] );
+		int mm 		= round( resvec[1] );
+		int kk 		= round( resvec[2] );
+		double	d_atom0	= 0.0	 ;
+			d_atom	= 1.0E+3 ;
+		clipper::Coord_orth minvec;
+		for ( int ish=0 ; ish<12 ; ish++ ) {
+			clipper::Vec3 < double > vnmk( nn + iel[0][ish], mm + iel[1][ish], kk + iel[2][ish]);
+			vcell	=  MO * vnmk;
+			clipper::Coord_orth kmnv ( vcell );
+			clipper::Coord_orth diffc( vdr-vcell );
+			d_atom0	= sqrt( diffc.lengthsq() );
+			if( d_atom0<d_atom ) {
+				d_atom = d_atom0 ;
+				minvec = diffc+mean_residue_pos;
+			}
+		}
+		if( d_atom < rat_cutoff ) {
+			v_close_rats.push_back(minvec);
+			v_rat_labels.push_back(rat_id);
+		}
+	}
+	if( 0 ) {
+		ofstream myfile;
+		stringstream ss;
+		ss << "sphere-" << im_new << chainid << ".xyz";
+		std::string fname(ss.str() );
+		myfile.open(fname. c_str() );
+		myfile << v_close_rats.size() << std::endl;		
+		myfile << "FOUND A SPHERE WITH STUFF" << std::endl;
+		for ( int ia=0 ; ia<v_close_rats.size() ; ia++ )
+			myfile	<< " Ar" 
+				<< " \t " << v_close_rats[ia].x() 
+				<< " \t " << v_close_rats[ia].y() 
+				<< " \t " << v_close_rats[ia].z() << std::endl;
+		myfile.close();
+	}
+
+	// HERE WE CAN CALCULATE THE CLASH SCORE
+	double  dist_crit	= 3.1000; // NEON!
+	double	badness		= 000.00;
+	double	b_scale		= 0.5E-4;
+	double 	d 		= 000.00;
+	double	score		= 000.00;
+	double	b_sig		= pow(  2.0 , 0.16667  );
+		b_sig		= dist_crit / b_sig 	;
+	//
+	int	bNewClash = true;
+	switch( bNewClash ) 
+	{
+		case true: {
+			for (unsigned int ifrag=0; ifrag<a_rotamer.fragments.size(); ifrag++) {
+				for (int ires=a_rotamer[ifrag].min_res_no(); ires<=a_rotamer[ifrag].max_residue_number(); ires++) {
+					std::string residue_name = a_rotamer[ifrag][ires].name;
+					bool is_standard_aa = false;
+					//if (coot::util::is_standard_residue_name(residue_name))
+						is_standard_aa = true;
+					for (int iat=0; iat<a_rotamer[ifrag][ires].n_atoms(); iat++) {
+						clipper::Coord_orth coar(	
+							a_rotamer[ifrag][ires][iat].pos.x(),
+							a_rotamer[ifrag][ires][iat].pos.y(),
+							a_rotamer[ifrag][ires][iat].pos.z()	);
+						for( int j=0 ; j<v_close_rats.size() ; j++ ) {
+							d_atom	 = clipper::Coord_orth::length( coar  , v_close_rats[j] );
+							std::vector<std::string> vdcid = decompose_cid( v_rat_labels[j] );
+							if(  
+					!(	chainid==vdcid[1] 
+						&& (	std::atoi(vdcid[2].c_str())==im_new
+						||	std::atoi(vdcid[2].c_str())==im_new-1 || std::atoi(vdcid[2].c_str())==im_new+1 )
+					 ) 		) { 
+								if( debug )
+									std::cout << "GOT DISTANCE::" << d_atom << std::endl;
+								double s_scale	 = 4.0*b_scale;
+								double	rp	 = b_sig/d_atom;
+								double	rp3	 = rp*rp*rp;
+								double	rp6	 = rp3*rp3;
+								double	rp12	 = rp6*rp6;
+								double	p_s	 = (rp12-rp6)*s_scale;
+								score	+= p_s;
+							}
+						}
+					}
+				}
+			}
+
+			} break;
+		case false: { 
+	// NOTE THAT THIS DOESNT WORK SIMPLY BECAUSE MMDB DOES NOT DO CONTACT SEEKING OR CLASH CHECKING ON SYMMETRY IMAGES. 
+	//	EVEN IF THEY HAVE BEEN GENERATED!!!
+			mmdb0 -> DeleteSelection	( SelHndl );
+			SelHndl = mmdb0 -> NewSelection ( 	  );
+			for ( unsigned int ifrag=0 ; ifrag<a_rotamer.fragments.size() ; ifrag++ ) {
+				for ( int ires=a_rotamer[ifrag].min_res_no() ; ires<=a_rotamer[ifrag].max_residue_number() ; ires++ ) {
+					std::string residue_name = a_rotamer[ifrag][ires].name;
+					bool is_standard_aa = false;
+					//if (coot::util::is_standard_residue_name(residue_name))
+						is_standard_aa = true;
+					for (int iat=0; iat<a_rotamer[ifrag][ires].n_atoms(); iat++) { 
+						// NOT MINIMAL DISTANCE (BETWEEN SYM) IN MMDB ...
+						mmdb0 -> SelectSphere (			
+     							SelHndl,			
+							 STYPE_ATOM ,			// select atoms
+							a_rotamer[ifrag][ires][iat].pos.x(),
+							a_rotamer[ifrag][ires][iat].pos.y(),
+							a_rotamer[ifrag][ires][iat].pos.z(),	// (x,y,z)-center of the sphere
+							dist_crit,				// radius of the sphere
+							 SKEY_OR				// NEW-selection
+						);
+					}
+				}
+			}
+//	CLEAR SELF ATOMS 
+//	CLEAR NEIGHBOR BB ATOMS BUT NOT CA
+			int ires_p = im_new+1,ires_m = im_new+1; 
+			mmdb0 -> Select	(	SelHndl ,  STYPE_ATOM , 1 , cid ,
+  		              			im_new	, "*", im_new, "*",
+						 "*", "*", "*", "*",  SKEY_CLR );
+			if( ires_m>0 )
+				mmdb0 -> Select (	SelHndl ,  STYPE_ATOM , 1 , cid ,
+  		              				ires_m	, "*", ires_m, "*",
+							"*", "N,C", "N,C", "*",  SKEY_CLR ); //,CA "N,CA,C"
+			if( ires_p <= mmdb0->GetNumberOfResidues(1, icid) )
+				mmdb0 -> Select	(	SelHndl ,  STYPE_ATOM , 1 , cid ,
+    			            			ires_p	, "*", ires_p, "*",
+							 "*", "N,C", "N,C", "*",  SKEY_CLR );
+			 PPAtom		clash_atoms;
+			int			nClashAtoms;
+			mmdb0 -> GetSelIndex	(	SelHndl , clash_atoms , nClashAtoms	);
+	
+			// HERE WE CAN CALCULATE THE CLASH SCORE
+			double	badness	= 000.00;
+			double	b_scale = 0.5E-4;
+			double 	d 	= 000.00;
+			double	score	= 000.00;
+			double	b_sig	= pow(  2.0 , 0.16667  );
+				b_sig	= dist_crit / b_sig ;
+
+			for (unsigned int ifrag=0; ifrag<a_rotamer.fragments.size(); ifrag++) {
+				for (int ires=a_rotamer[ifrag].min_res_no(); ires<=a_rotamer[ifrag].max_residue_number(); ires++) {
+					std::string residue_name = a_rotamer[ifrag][ires].name;
+					bool is_standard_aa = false;
+					//if (coot::util::is_standard_residue_name(residue_name))
+						is_standard_aa = true;
+					for (int iat=0; iat<a_rotamer[ifrag][ires].n_atoms(); iat++) {
+						clipper::Coord_orth coar(
+							a_rotamer[ifrag][ires][iat].pos.x(),
+							a_rotamer[ifrag][ires][iat].pos.y(),
+							a_rotamer[ifrag][ires][iat].pos.z()
+						);
+				// WE HAVE ALL THE ATOMS THAT ARE CLOSE BUT CLIPPER/MMDB DOES NOT DIRECTLY YIELD THE MINIMAL DISTANCE
+						for( int j=0 ; j<nClashAtoms ; j++ ) {
+							clipper::Coord_orth 
+								coap(	 clash_atoms[j]->x,
+									 clash_atoms[j]->y,
+									 clash_atoms[j]->z );
+							d_atom	 = clipper::Coord_orth::length( coar , coap );
+							if( 0 ) {	
+							// in coap box so coar must be shifted there
+							// below is old code
+   							// clipper::Vec3 < double > vcrd( codr.x() , codr.y() , codr.z() );
+								clipper::Coord_orth codr = coar - coap;
+								clipper::Vec3 < double > vcor( coar.x() , coar.y() , coar.z() );
+								clipper::Vec3 < double > resvec, vcell;
+								resvec		= MF * vcor;
+				//				
+				//	absolute coordinate	
+				//				
+								int nn		= floor( resvec[0] );	// int cellshift n
+								int mm 		= floor( resvec[1] );	// int cellshift m
+								int kk 		= floor( resvec[2] );	// int cellshift k
+								double d_atom0	= 0.0000 ;
+								d_atom 		= 1.0E+3 ;
+								for( int ish=0 ; ish<12 ; ish++ ) {
+									clipper::Vec3 < double > vnmk( 
+								nn + iel[0][ish], mm + iel[1][ish], kk + iel[2][ish]	);
+									vcell	 	= MO * vnmk;
+									clipper::Coord_orth kmnv(vcell);
+									d_atom0	= clipper::Coord_orth::length( codr , kmnv );
+									d_atom	= ( d_atom0<d_atom )?( d_atom0 ):( d_atom );
+								}
+							}
+							if( 1 ) {
+								if( debug && 0 )
+									std::cout << "GOT DISTANCE::" << d_atom << std::endl;
+								double s_scale	 = 4.0*b_scale;
+								double	rp	 = b_sig/d_atom;
+								double	rp3	 = rp*rp*rp;
+								double	rp6	 = rp3*rp3;
+								double	rp12	 = rp6*rp6;
+								double	p_s	 = (rp12-rp6)*s_scale;
+								score	+= p_s;
+							}
+						}
+					}
+				}
+			}
+
+			} break;
+		default:
+			break;
+	}
+
+	if( debug ) {
+		std::cout << "CRYSTAL HAVE " << nsymops		<< " SYMMETRY OPS   " 	<< std::endl;
+		std::cout << "CRYSTAL HAVE " << nASUatoms	<< " ASYMMET. ATOMS " 	<< std::endl;
+		std::cout << "CRYSTAL HAVE " << nUNIatoms	<< " UNITCELL ATOMS " 	<< std::endl;
+	}
+
+	score = (score<0) ? (0) : (score);
+*/
 
 int
 mmdb_helper::copy_xtal( CMMDBManager* mmdb, CMMDBManager* mmdb_N ) {
@@ -164,12 +733,13 @@ mmdb_helper::update_residue( int imod, int icha, int ires, CMMDBManager *mmdb0, 
 
 	mmdb0->GetAtomTable    ( imod ,icha ,ires , atoms, nAtoms );
 
-	if( nAtoms == residue.size() ) {
+	if( nAtoms == residue.size() ) { // ASSUMES ORDER IS PRESERVED AND EVERYONE IS HAPPY
 		for (int k=0;k<nAtoms;k++){
 			atoms[k]->x=gsl_vector_get(residue[k].second,XX);
 			atoms[k]->y=gsl_vector_get(residue[k].second,YY);
 			atoms[k]->z=gsl_vector_get(residue[k].second,ZZ);
 		}
+		generate_sym();
 		return 0;
 	}else{
 		return 1;

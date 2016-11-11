@@ -87,6 +87,8 @@ int main ( int argc, char ** argv ) {
 
 //	THIS TOOL CURRENTLY ONLY FOR PDB
 	CMMDBManager   mmdb, mmdb_N;
+	CMMDBManager	*mmdb_p;
+	mmdb_p=&mmdb;
 	int itype, otype;
 	itype = MMDB_FILE_PDB;
 
@@ -121,9 +123,37 @@ int main ( int argc, char ** argv ) {
 	int		nModels;
 	int 		nChains,nResidues,nAtoms,nAtoms2;
 	int		imod,icha,ires,iat;
-	rich::mmdb_helper mmhelp;
 
-	mmdb.GetModelTable	( model_T, nModels );
+	if( verbose )
+		std::cout << "INFO:: BUILD HELP" << std::endl;
+	rich::mmdb_helper mmhelp(&mmdb) ;
+	if( verbose )
+		std::cout << "INFO:: GEN SYM" << std::endl;
+	mmhelp.generate_sym( );
+	if( verbose )
+		std::cout << "INFO:: GET MOL" << std::endl;
+	mmhelp.get_mol( );
+	if( verbose )
+		std::cout << "INFO:: HAS MAN" << std::endl;
+	mmhelp.has_manager( ); 
+	if( verbose )
+		std::cout << "INFO:: HAS UNI" << std::endl;
+	mmhelp.has_unitcell( ); 
+	if( verbose )
+		std::cout << "INFO:: HAS CELL" << std::endl;
+	mmhelp.has_cell( ); 
+	if( verbose )
+		std::cout << "INFO:: HAS CHEEZEBURGER" << std::endl;
+	mmhelp.has_symmetry( );
+	if( verbose )
+		std::cout << "INFO:: SANE" << std::endl;
+	mmhelp.remove_sym( );
+
+	//mmdb.GetModelTable	( model_T, nModels );
+	mmhelp.get_mol()->GetModelTable( model_T, nModels );
+	if( verbose )
+		std::cout << "INFO:: USED STRUCT" << std::endl;
+
 	model = newCModel	(	);
 	model -> Copy		( model_T[0] );
 	mmdb_N.AddModel		(  model );
@@ -132,7 +162,8 @@ int main ( int argc, char ** argv ) {
 	// XTAL HEADER
 	mmhelp.copy_xtal( &mmdb , &mmdb_N );
 
-	std::cout << "INFO:: HAVE " << nModels << " MODELS" << std::endl;
+	if( verbose )
+		std::cout << "INFO:: HAVE " << nModels << " MODELS" << std::endl;
 	int nErr=0;
 
 	// ORTHONORMAL SYSTEM VECTORS
@@ -141,7 +172,8 @@ int main ( int argc, char ** argv ) {
 	gsl_vector *qh = gsl_vector_calloc(DIM);
 
 	std::vector< std::pair<int,double> > theta, chi;
-	int Ntheta=NBINS_IO;
+	int Ntheta = NBINS_IO;
+
 	for ( int i=0 ; i<Ntheta ; i++ ) {
 		std::pair< int, double > pid;
 		pid.first=i; pid.second=0.0;
@@ -150,33 +182,35 @@ int main ( int argc, char ** argv ) {
 	}
 
 	int nb		= NBINS_IO;
-	double TOL	= 55E-2;
+	double TOL	= 30E-2;
+	std::cout << "INFO:: HERE" << std::endl;
 
 	for ( imod=1 ; imod<=nModels ; imod++ ) {
-		nChains = mmdb.GetNumberOfChains( imod ); 
+		nChains = mmdb.GetNumberOfChains( imod );
+		if( verbose )
+			std::cout << "INFO:: CHAIN LOOP " << nChains << std::endl; 
 		for ( icha = 0 ; icha < nChains ; icha++ ) { 
 			nResidues = mmdb.GetNumberOfResidues( imod , icha ); 
 			rich::particles residue_atoms;
+			if( verbose )
+				std::cout << "INFO:: RES LOOP" << std::endl;
 			for ( ires = 0 ; ires < nResidues ; ires++ ) { 
 
 				rich::residue_helper rh;
 				double rc = rh.analyze_stage1( imod, icha, ires, &mmdb, nb , &residue_atoms );
 				double zc = rh.calc_OS();			// CALCULATE ORTHONORMAL SYSTEM
-				if(rh.skip())
+				if( rh.skip() )
 					continue;
-
 				if( (ires == 40 || ires==88) && icha==0 && verbose == 2)
 					rh.calc_proj( density, mmap.get_gsa(), &theta , nb , 0 , ires );
 				else
 					rh.calc_proj( density, mmap.get_gsa(), &theta , nb , 0 );
-
 				gsl_vector *v0  = gsl_vector_calloc(DIM);
 				rh.copyv0(v0);
 
 //			HERE WE ARE AT SPECIFIC PROJECTIONS PROBLEM
 //			CALCULATE PROJECTION
 				if( (ires == 40 || ires==88) && icha==0 ) {	// TESTCASE
-
 					if( verbose ) {			
 						rich::mat_io mIO;
 						mIO.write_vdbl2dat( theta, "res"+std::to_string(ires) +
@@ -218,7 +252,7 @@ int main ( int argc, char ** argv ) {
 							gsl_matrix *O1	= gsl_matrix_calloc( DIM, DIM );
 							rh.copyO1(O1);
 							gsl_matrix_get_row( ph, O1, 0 );
-							double chi0 = rh.calc_fi(rotres_atoms1,1);//HERE
+							double chi0 = rh.calc_fi(rotres_atoms1,1); // HERE
 
 							for(int i_chi=0; i_chi < v_chi.size() ; i_chi++) {
 								rich::quaternion qq;
@@ -228,7 +262,7 @@ int main ( int argc, char ** argv ) {
 									if(verbose)
 										std::cout << "INFO:: WE HAVE A BAD MASK" << std::endl;		
 								qq.rotate_particles( rotres_atoms1 , v00 , mask );
-								if( mmhelp.check_clash( 1 , icha, ires, &mmdb, rotres_atoms1, 1.2 ) > 1 ) {
+								if( mmhelp.check_clash_sym( 1 , icha, ires, &mmdb, rotres_atoms1, 1.2 )  ) {
 									if(verbose)
 										std::cout << "INFO:: WE HAVE CLASH" << std::endl;
 								} else {
@@ -236,10 +270,12 @@ int main ( int argc, char ** argv ) {
 									model->Copy( model_T[0] );
 									NM++;
 									mmdb_N.AddModel( model  );
+									std::cout << "::GONNA UPDATE::" << std::endl;
 									if( mmhelp.update_residue( NM ,icha ,ires, &mmdb_N, rotres_atoms1 ) ) {
 										std::cout << "::ERROR::" << std::endl;
 										fatal();
 									}
+									std::cout << "::DID IT::" << std::endl;
 									if( verbose == 2 ) {
 										char a_inf[256];
 										PPCAtom		atoms_T, atoms_T2;
@@ -251,7 +287,7 @@ int main ( int argc, char ** argv ) {
 							}
 						}
 
-						if( mmhelp.check_clash( NM, icha, ires, &mmdb_N, rotres_atoms0, 1.0 ) > 1 ) {
+						if( mmhelp.check_clash_sym( NM, icha, ires, &mmdb_N, rotres_atoms0, 1.0 )  ) {
 							if(verbose)
 								std::cout << "INFO:: WE HAVE CLASH" << std::endl;
 						} else {

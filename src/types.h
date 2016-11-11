@@ -78,21 +78,46 @@ namespace rich {
 
 	class mmdb_helper {
 		public:
+			mmdb_helper()	{bHaveUni_=0; bHaveAsu_=0;bHaveManager_=0;nAsuAts_=0; 
+					nUniAts_=0;bHaveCell_=0; nChains0_=0;nChainsS_=0;};
+			mmdb_helper( CMMDBManager* mmdb ) { mmdb_= mmdb; bHaveUni_=0; bHaveAsu_=0; 
+							bHaveManager_=1;nAsuAts_=0; nUniAts_=0; nChains0_=0; nChainsS_=0;};
 			std::string	atom_type( char * );
 			std::string	atom_symb( char * );
 			std::string	atom_resn( char * );
-			int	update_residue	( int, int, int, CMMDBManager*, particles );
-			int	check_clash	( int, int, int, CMMDBManager*, particles , double );
-			int	copy_xtal	( CMMDBManager*, CMMDBManager* );
+			int	update_residue	(  int, int, int , CMMDBManager*, particles );
+			int	check_clash	(  int, int, int , CMMDBManager*, particles , double );
+			int	check_clash_sym	(  int, int, int , CMMDBManager*, particles , double );
+			int	copy_xtal	(  CMMDBManager* , CMMDBManager* );
+			int	generate_sym	( ); 	// HARDCODED MODEL 1
+			int	remove_sym	( );
+			int	has_manager	( ) { return bHaveManager_; };
+			int	has_unitcell	( ) { return bHaveUni_; };
+			int	has_cell	( ) { return bHaveCell_; };		// loc_cell_
+			double	min_dist	( int i , int j );
+			double	min_dist	( int, int, int, particles );		// im,ic,ir
+			bool	has_symmetry	( ) { return (nUniAts_>nAsuAts_); };	// not strict enough but true if symmetry
+			std::pair<int,int>	get_natoms() { 
+							std::pair<int,int> spi; 
+							spi.first=nAsuAts_; spi.second=nUniAts_;
+							return spi;
+						}
+			void	set_manager ( CMMDBManager* cmmdb ) { mmdb_=cmmdb; bHaveManager_=1; };
+			CMMDBManager*	get_mol ( ) { return mmdb_; };
 		private:
-			;
+			int	bHaveUni_	, bHaveAsu_ ,	bHaveManager_, bHaveCell_;
+			int	nAsuAts_	,  nUniAts_ ;
+			CMMDBManager	*mmdb_;
+			int	nChains0_; // SYM MATES ARE ADDED AS CHAINS
+			int	nChainsS_; // SYM MATES ARE ADDED AS CHAINS
+			clipper::Cell 	loc_cell_;
 	};
 
 	class math_helper {
 		public:
 			math_helper(){ bHelp_=false; };
-			void	gsl_cross3D	( gsl_vector * , gsl_vector *, gsl_vector * );
-			double	gsl_calc_orth	( gsl_vector * , gsl_vector *, gsl_vector *,
+			void	gsl_cross3D	( gsl_vector * , gsl_vector * , gsl_vector * );
+			double	gsl_calc_orth	( gsl_vector * , gsl_vector * , gsl_vector * ,
 						  gsl_vector * , gsl_matrix * );
 		private:
 			bool bHelp_;
