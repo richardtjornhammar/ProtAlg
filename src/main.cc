@@ -147,7 +147,7 @@ int main ( int argc, char ** argv ) {
 	mmhelp.has_symmetry( );
 	if( verbose )
 		std::cout << "INFO:: SANE" << std::endl;
-	mmhelp.remove_sym( );
+	
 
 	//mmdb.GetModelTable	( model_T, nModels );
 	mmhelp.get_mol()->GetModelTable( model_T, nModels );
@@ -337,7 +337,7 @@ int main ( int argc, char ** argv ) {
 			}
 		}
 	}
-
+	// mmhelp.remove_sym( );
 	mmdb_N.GetModelTable( model_T, nModels );
 	std::cout << "INFO:: GENERATED " << nModels << " MODELS (" << NM << ")" << std::endl;
 	mmdb_N.FinishStructEdit();
